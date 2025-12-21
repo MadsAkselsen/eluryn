@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "scripts": {
+    "hooks:enable": "git config core.hooksPath .githooks",
+    "hooks:disable": "git config --unset core.hooksPath",
+    "setup": "npm run hooks:enable"
+  }
+}
