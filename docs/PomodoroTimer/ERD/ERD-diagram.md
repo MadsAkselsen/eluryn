@@ -6,6 +6,11 @@ erDiagram
     WEB_USERS ||--o{ FOCUS_LOG_ENTRIES : has
     POMODORO_SESSIONS ||--o{ FOCUS_LOG_ENTRIES : contains
 
+    WEB_USERS ||--o{ USER_FOCUS_DAILY : aggregates
+    WEB_USERS ||--o{ USER_FOCUS_WEEKLY : aggregates
+    WEB_USERS ||--o{ USER_FOCUS_MONTHLY : aggregates
+    WEB_USERS ||--|| USER_FOCUS_ALL_TIME : aggregates
+
     WEB_USERS {
         uuid id PK
         string username
@@ -56,8 +61,38 @@ erDiagram
         datetime started_at_utc
         datetime ended_at_utc
         int duration_seconds
+        int active_seconds "computed at write-time"
         int pause_seconds
         boolean ended_early
     }
+
+    USER_FOCUS_DAILY {
+        uuid user_id PK, FK
+        date date_utc PK                 "one row per user per day"
+        int focus_seconds
+        datetime updated_at_utc
+    }
+
+    USER_FOCUS_WEEKLY {
+        uuid user_id PK, FK
+        date week_start_utc PK           "anchor date (e.g. Monday)"
+        int focus_seconds
+        datetime updated_at_utc
+    }
+
+    USER_FOCUS_MONTHLY {
+        uuid user_id PK, FK
+        date month_start_utc PK          "anchor date (first of month)"
+        int focus_seconds
+        datetime updated_at_utc
+    }
+
+    USER_FOCUS_ALL_TIME {
+        uuid user_id PK, FK              "one row per user"
+        int focus_seconds
+        datetime updated_at_utc
+    }
+
+
 
 ```
