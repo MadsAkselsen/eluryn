@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: eluryn
       POSTGRES_DB: eluryn
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - eluryn_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -30,7 +30,7 @@ services:
       -schemas=users,pomotimer
       migrate
     volumes:
-      - ./backend/db/migrations:/flyway/sql:ro
+      - ./backend/Eluryn.Api/db/migrations:/flyway/sql:ro
 
   # api:
   #   build:
