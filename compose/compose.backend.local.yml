@@ -15,12 +15,15 @@ services:
     image: flyway/flyway:10
     depends_on:
       - db
-    command: >
-      -url=jdbc:postgresql://db:5432/eluryn
-      -user=users_svc
-      -password=users_pw
-      -connectRetries=30
-      migrate
+    command:
+      [
+        "-url=jdbc:postgresql://db:5432/eluryn",
+        "-user=users_svc",
+        "-password=users_pw",
+        "-connectRetries=30",
+        "-schemas=users",
+        "migrate"
+      ]
     volumes:
       - ../backend/services/Users/Eluryn.Users.Api/migrations:/flyway/sql:ro
 
@@ -28,12 +31,15 @@ services:
     image: flyway/flyway:10
     depends_on:
       - db
-    command: >
-      -url=jdbc:postgresql://db:5432/eluryn
-      -user=pomotimer_svc
-      -password=pomo_pw
-      -connectRetries=30
-      migrate
+    command:
+      [
+        "-url=jdbc:postgresql://db:5432/eluryn",
+        "-user=pomotimer_svc",
+        "-password=pomo_pw",
+        "-connectRetries=30",
+        "-schemas=pomotimer",
+        "migrate"
+      ]
     volumes:
       - ../backend/services/Pomotimer/Eluryn.Pomotimer.Api/migrations:/flyway/sql:ro
 

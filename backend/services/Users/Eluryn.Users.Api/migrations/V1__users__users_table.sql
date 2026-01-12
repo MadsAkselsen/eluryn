@@ -1,12 +1,9 @@
-create schema if not exists users;
-set search_path to users;
-
-create table if not exists users (
-  id uuid primary key,
-  username text not null,
-  created_at_utc timestamptz not null default now(),
-  updated_at_utc timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS users.users (
+  id uuid PRIMARY KEY,
+  username text NOT NULL,
+  created_at_utc timestamptz NOT NULL DEFAULT now(),
+  updated_at_utc timestamptz NOT NULL DEFAULT now()
 );
 
-create unique index if not exists ux_users_username
-  on users (username);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_users_username
+  ON users.users (username);
