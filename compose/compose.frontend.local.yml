@@ -1,0 +1,13 @@
+services:
+  frontend:
+    image: node:23
+    working_dir: /app
+    volumes:
+      - ../frontend:/app
+    ports:
+      - "5173:5173"
+    environment:
+      # Change this to whatever you want your frontend to call.
+      # If you have a gateway later, point it there.
+      - VITE_API_BASE_URL=http://localhost:5001
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
