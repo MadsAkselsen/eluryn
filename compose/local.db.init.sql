@@ -19,15 +19,13 @@ GRANT CONNECT ON DATABASE eluryn TO pomotimer_svc;
 CREATE SCHEMA IF NOT EXISTS users;
 CREATE SCHEMA IF NOT EXISTS pomotimer;
 
--- ✅ Make each schema owned by its service role (removes permission edge cases)
-ALTER SCHEMA users OWNER TO users_svc;
-ALTER SCHEMA pomotimer OWNER TO pomotimer_svc;
+-- ALTER SCHEMA users OWNER TO users_svc;
+-- ALTER SCHEMA pomotimer OWNER TO pomotimer_svc;
 
 -- Give each service user access only to its schema
 GRANT USAGE, CREATE ON SCHEMA users TO users_svc;
 GRANT USAGE, CREATE ON SCHEMA pomotimer TO pomotimer_svc;
 
--- ✅ Ensure existing objects are accessible (safe even if none exist yet)
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA users TO users_svc;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA users TO users_svc;
 

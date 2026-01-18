@@ -12,7 +12,7 @@ services:
       - ./local.db.init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
 
   flyway-users:
-    image: flyway/flyway:10
+    image: flyway/flyway:11.20.1
     depends_on:
       - db
     command:
@@ -28,7 +28,7 @@ services:
       - ../backend/services/Users/Eluryn.Users.Api/migrations:/flyway/sql:ro
 
   flyway-pomotimer:
-    image: flyway/flyway:10
+    image: flyway/flyway:11.20.1
     depends_on:
       - db
     command:
@@ -62,6 +62,27 @@ services:
       ConnectionStrings__Db: Host=db;Port=5432;Database=eluryn;Username=pomotimer_svc;Password=pomo_pw
     ports:
       - "5002:8080"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.local
+    depends_on:
+      - users-api
+      - pomotimer-api
+    ports:
+      - "5173:5173"
+    develop:
+      watch:
+        - path: ../frontend/src
+          target: /app/src
+          action: sync
+        - path: ../frontend/package.json
+          target: /app/package.json
+          action: restart
+        - path: ../frontend/vite.config.js
+          target: /app/vite.config.js
+          action: restart
 
 volumes:
   eluryn-db:
