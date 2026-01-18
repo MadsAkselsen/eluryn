@@ -1,5 +1,3 @@
-set search_path to pomotimer;
-
 -- Sessions: common query patterns (user + recency)
 create index if not exists ix_pomodoro_sessions_user_created
   on pomodoro_sessions (user_id, created_at_utc desc);
