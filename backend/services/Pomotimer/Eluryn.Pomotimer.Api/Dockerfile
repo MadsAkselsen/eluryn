@@ -9,13 +9,13 @@ COPY . ./
 RUN dotnet publish ./Eluryn.Pomotimer.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 # --- runtime stage ---
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+RUN dotnet publish ./Eluryn.Users.Api.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
 WORKDIR /app
 
 RUN useradd -m -u 10001 -s /usr/sbin/nologin eluryn
 USER eluryn
 
-COPY --from=build --chown=app:app /app/publish ./
+COPY --from=build /app/publish ./
 
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
