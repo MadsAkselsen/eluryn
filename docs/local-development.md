@@ -58,3 +58,11 @@ docker compose -f compose/compose.local.yml ps
 docker compose -f compose/compose.local.yml logs -f frontend
 ```
 
+## Tests
+
+#### Run E2E playwright tests same way as in pipeline
+
+```bash
+docker compose -f compose/compose.local.yml -f compose/compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+```
+
