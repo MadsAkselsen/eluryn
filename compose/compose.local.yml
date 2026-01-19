@@ -1,4 +1,22 @@
 services:
+  traefik:
+    image: traefik:v3
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard (local only)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ../certs:/certs:ro
   db:
     image: postgres:16
     environment:
@@ -11,6 +29,7 @@ services:
       - eluryn-db:/var/lib/postgresql/data
       - ./local.db.init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
 
+#! how come flyway dont need to use labels for traefik like the apis?
   flyway-users:
     image: flyway/flyway:11.20.1
     depends_on:
@@ -50,8 +69,26 @@ services:
       - flyway-users
     environment:
       ConnectionStrings__Db: Host=db;Port=5432;Database=eluryn;Username=users_svc;Password=users_pw
-    ports:
-      - "5001:8080"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.users.rule=Host(`api.localhost`) && PathPrefix(`/users`)
+      - traefik.http.routers.users.entrypoints=web
+      - traefik.http.middlewares.users-stripprefix.stripprefix.prefixes=/users
+      # - traefik.http.routers.users.middlewares=users-stripprefix
+
+      # ✅ CORS middleware (local)
+      - traefik.http.middlewares.users-cors.headers.accesscontrolalloworiginlist=https://localhost:5173,http://localhost:5173
+      - traefik.http.middlewares.users-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH
+      - traefik.http.middlewares.users-cors.headers.accesscontrolallowheaders=*
+      - traefik.http.middlewares.users-cors.headers.addvaryheader=true
+
+      # apply both middlewares
+      - traefik.http.routers.users.middlewares=users-stripprefix,users-cors
+
+      - traefik.http.routers.users.entrypoints=websecure
+      - traefik.http.routers.users.tls=true
+
+      - traefik.http.services.users.loadbalancer.server.port=8080
 
   pomotimer-api:
     build:
@@ -60,29 +97,52 @@ services:
       - flyway-pomotimer
     environment:
       ConnectionStrings__Db: Host=db;Port=5432;Database=eluryn;Username=pomotimer_svc;Password=pomo_pw
-    ports:
-      - "5002:8080"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pomotimer.rule=Host(`api.localhost`) && PathPrefix(`/pomotimer`)
+      - traefik.http.routers.pomotimer.entrypoints=web
+      - traefik.http.middlewares.pomotimer-stripprefix.stripprefix.prefixes=/pomotimer
+      # - traefik.http.routers.pomotimer.middlewares=pomotimer-stripprefix
 
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile.local
-    depends_on:
-      - users-api
-      - pomotimer-api
-    ports:
-      - "5173:5173"
-    develop:
-      watch:
-        - path: ../frontend/src
-          target: /app/src
-          action: sync
-        - path: ../frontend/package.json
-          target: /app/package.json
-          action: restart
-        - path: ../frontend/vite.config.js
-          target: /app/vite.config.js
-          action: restart
+      # ✅ CORS middleware (local)
+      - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolalloworiginlist=https://localhost:5173,http://localhost:5173
+      - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH
+      - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowheaders=*
+      - traefik.http.middlewares.pomotimer-cors.headers.addvaryheader=true
+
+      # apply both middlewares
+      - traefik.http.routers.pomotimer.middlewares=pomotimer-stripprefix,pomotimer-cors
+
+      - traefik.http.routers.pomotimer.entrypoints=websecure
+      - traefik.http.routers.pomotimer.tls=true
+
+      - traefik.http.services.pomotimer.loadbalancer.server.port=8080
+
+  # frontend:
+  #   build:
+  #     context: ../frontend
+  #     dockerfile: Dockerfile.local
+  #   depends_on:
+  #     - users-api
+  #     - pomotimer-api
+  #   ports:
+  #     - "5173:5173"
+  #   labels:
+  #     - traefik.enable=true
+  #     - traefik.http.routers.frontend.rule=Host(`app.localhost`)
+  #     - traefik.http.routers.frontend.entrypoints=web
+  #     - traefik.http.services.frontend.loadbalancer.server.port=5173
+  #   develop:
+  #     watch:
+  #       - path: ../frontend/src
+  #         target: /app/src
+  #         action: sync
+  #       - path: ../frontend/package.json
+  #         target: /app/package.json
+  #         action: restart
+  #       - path: ../frontend/vite.config.ts
+  #         target: /app/vite.config.ts
+  #         action: restart
 
 volumes:
   eluryn-db:

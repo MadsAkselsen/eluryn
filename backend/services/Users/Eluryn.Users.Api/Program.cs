@@ -1,5 +1,14 @@
 var builder = WebApplication.CreateBuilder(args);
 
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy("DevCors", p =>
+//         p.WithOrigins("http://localhost:5173", "http://app.localhost")
+//          .AllowAnyHeader()
+//          .AllowAnyMethod()
+//     );
+// });
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -12,7 +21,12 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+// app.UseCors("DevCors");
 
 var summaries = new[]
 {
