@@ -16,8 +16,9 @@ mkcert -install
 
 ## Step 3 - Generate certs for the domains you use
 
+From the root of the repo run:
+
 ```bash
-mkdir -p certs
 mkcert -key-file certs/local-key.pem -cert-file certs/local-cert.pem localhost 127.0.0.1 api.localhost
 ```
 

@@ -9,6 +9,10 @@ services:
       - --entrypoints.websecure.address=:443
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --accesslog=true
+
     ports:
       - "80:80"
       - "443:443"
@@ -72,7 +76,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.users.rule=Host(`api.localhost`) && PathPrefix(`/users`)
-      - traefik.http.routers.users.entrypoints=web
+      # - traefik.http.routers.users.entrypoints=web
       - traefik.http.middlewares.users-stripprefix.stripprefix.prefixes=/users
       # - traefik.http.routers.users.middlewares=users-stripprefix
 
@@ -100,7 +104,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.pomotimer.rule=Host(`api.localhost`) && PathPrefix(`/pomotimer`)
-      - traefik.http.routers.pomotimer.entrypoints=web
+      # - traefik.http.routers.pomotimer.entrypoints=web
       - traefik.http.middlewares.pomotimer-stripprefix.stripprefix.prefixes=/pomotimer
       # - traefik.http.routers.pomotimer.middlewares=pomotimer-stripprefix
 
