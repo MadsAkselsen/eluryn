@@ -6,10 +6,10 @@ COPY Eluryn.Pomotimer.Api.csproj ./
 RUN dotnet restore ./Eluryn.Pomotimer.Api.csproj
 
 COPY . ./
-RUN dotnet publish ./Eluryn.Pomotimer.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish ./Eluryn.Pomotimer.Api.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 # --- runtime stage ---
-RUN dotnet publish ./Eluryn.Users.Api.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 RUN useradd -m -u 10001 -s /usr/sbin/nologin eluryn
