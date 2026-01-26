@@ -9,8 +9,11 @@ services:
       - --entrypoints.websecure.address=:443
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
+      # redirect all http to https
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      # make sure the redirect sceheme is https
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      # Enables Traefik access logs (every request through Traefik gets logged)
       - --accesslog=true
 
     ports:
@@ -33,7 +36,6 @@ services:
       - eluryn-db:/var/lib/postgresql/data
       - ./local.db.init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
 
-#! how come flyway dont need to use labels for traefik like the apis?
   flyway-users:
     image: flyway/flyway:11.20.1
     depends_on:
@@ -75,24 +77,26 @@ services:
       ConnectionStrings__Db: Host=db;Port=5432;Database=eluryn;Username=users_svc;Password=users_pw
     labels:
       - traefik.enable=true
+      # creates a router named "users" that listens to api.localhost/users
       - traefik.http.routers.users.rule=Host(`api.localhost`) && PathPrefix(`/users`)
-      # - traefik.http.routers.users.entrypoints=web
+      # removes the /users prefix when forwarding to the service. So a request to api.localhost/users/weatherforecast becomes /weatherforecast to the service.
+      # So it will be forwarded to http://<users-api-container-ip>:8080/weatherforecast.
       - traefik.http.middlewares.users-stripprefix.stripprefix.prefixes=/users
-      # - traefik.http.routers.users.middlewares=users-stripprefix
+      - traefik.http.services.users.loadbalancer.server.port=8080
 
-      # ✅ CORS middleware (local)
+      # CORS middleware (local)
       - traefik.http.middlewares.users-cors.headers.accesscontrolalloworiginlist=https://localhost:5173,http://localhost:5173
       - traefik.http.middlewares.users-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH
       - traefik.http.middlewares.users-cors.headers.accesscontrolallowheaders=*
       - traefik.http.middlewares.users-cors.headers.addvaryheader=true
 
-      # apply both middlewares
+      # Attaches both middlewares to the router, in that order
       - traefik.http.routers.users.middlewares=users-stripprefix,users-cors
 
+      # This router listens on HTTPS only (port 443 entrypoint) 
       - traefik.http.routers.users.entrypoints=websecure
+      # Enables TLS termination for this router
       - traefik.http.routers.users.tls=true
-
-      - traefik.http.services.users.loadbalancer.server.port=8080
 
   pomotimer-api:
     build:
@@ -104,17 +108,13 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.pomotimer.rule=Host(`api.localhost`) && PathPrefix(`/pomotimer`)
-      # - traefik.http.routers.pomotimer.entrypoints=web
       - traefik.http.middlewares.pomotimer-stripprefix.stripprefix.prefixes=/pomotimer
-      # - traefik.http.routers.pomotimer.middlewares=pomotimer-stripprefix
 
-      # ✅ CORS middleware (local)
       - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolalloworiginlist=https://localhost:5173,http://localhost:5173
       - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH
       - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowheaders=*
       - traefik.http.middlewares.pomotimer-cors.headers.addvaryheader=true
 
-      # apply both middlewares
       - traefik.http.routers.pomotimer.middlewares=pomotimer-stripprefix,pomotimer-cors
 
       - traefik.http.routers.pomotimer.entrypoints=websecure
