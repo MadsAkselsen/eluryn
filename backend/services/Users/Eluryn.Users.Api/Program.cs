@@ -1,19 +1,33 @@
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// builder.Services.AddCors(options =>
-// {
-//     options.AddPolicy("DevCors", p =>
-//         p.WithOrigins("http://localhost:5173", "http://app.localhost")
-//          .AllowAnyHeader()
-//          .AllowAnyMethod()
-//     );
-// });
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+
+    // Trust the docker edge subnet where Traefik lives
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Parse("172.20.0.0"), 16));
+
+});
+
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
+
+app.Logger.LogInformation("Users API starting up. Env={Env}", app.Environment.EnvironmentName);
+
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -23,10 +37,8 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
+    // app.UseHttpsRedirection();
 }
-
-// app.UseCors("DevCors");
 
 var summaries = new[]
 {

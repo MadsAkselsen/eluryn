@@ -11,8 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\shared\Eluryn.Contracts\Eluryn.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\shared\Eluryn.BuildingBlocks\Eluryn.BuildingBlocks.csproj" />
   </ItemGroup>
 
 </Project>

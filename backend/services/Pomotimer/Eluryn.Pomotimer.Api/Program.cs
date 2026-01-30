@@ -1,4 +1,20 @@
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+
+    options.ForwardLimit = 1;
+
+    // Trust the docker edge subnet where Traefik lives
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Parse("172.20.0.0"), 16));
+
+});
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -6,13 +22,27 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// if (app.Environment.IsDevelopment())
+// {
+    // app.Logger.LogInformation(
+    //     "Users API starting. Env={Env}",
+    //     app.Environment.EnvironmentName
+    // );
+    // app.UseForwardedHeaders(new ForwardedHeadersOptions
+    // {
+    //     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    // });
+    
+// }
+
 
 var summaries = new[]
 {
