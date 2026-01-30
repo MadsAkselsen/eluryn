@@ -2,7 +2,8 @@ services:
   traefik:
     image: traefik:v3
     networks:
-      - edge
+      edge:
+        ipv4_address: 172.20.0.10 # static IP for traefik in edge network so backend services can add it to known proxies
     security_opt:
       - no-new-privileges:true
     command:

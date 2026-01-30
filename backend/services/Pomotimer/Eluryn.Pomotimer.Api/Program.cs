@@ -6,14 +6,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto;
+        ForwardedHeaders.XForwardedFor | // forward client IP
+        ForwardedHeaders.XForwardedProto | // forward original scheme (https)
+        ForwardedHeaders.XForwardedHost; // forward original host
 
     options.ForwardLimit = 1;
 
-    // Trust the docker edge subnet where Traefik lives
-    options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Parse("172.20.0.0"), 16));
-
+    // Trust Traefik IP
+    options.KnownProxies.Add(IPAddress.Parse("172.20.0.10"));
 });
 
 // Add services to the container.
@@ -29,20 +29,6 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-// if (app.Environment.IsDevelopment())
-// {
-    // app.Logger.LogInformation(
-    //     "Users API starting. Env={Env}",
-    //     app.Environment.EnvironmentName
-    // );
-    // app.UseForwardedHeaders(new ForwardedHeadersOptions
-    // {
-    //     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    // });
-    
-// }
-
 
 var summaries = new[]
 {
