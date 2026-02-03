@@ -4,11 +4,13 @@ services:
     networks:
       edge:
         ipv4_address: 172.20.0.10 # static IP for traefik in edge network so backend services can add it to known proxies
+      internal:
+        ipv4_address: 172.21.0.10
     security_opt:
       - no-new-privileges:true
     command:
       # when routing to containers, use the edge network IPs
-      - --providers.docker.network=eluryn-edge
+      - --providers.docker.network=eluryn-internal
       - --api.insecure=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
@@ -88,7 +90,6 @@ services:
     depends_on:
       - flyway-users
     networks:
-      - edge
       - internal
     environment:
       ConnectionStrings__Db: Host=db;Port=5432;Database=eluryn;Username=users_svc;Password=users_pw
@@ -124,7 +125,6 @@ services:
     depends_on:
       - flyway-pomotimer
     networks:
-      - edge
       - internal
     environment:
       ConnectionStrings__Db: Host=db;Port=5432;Database=eluryn;Username=pomotimer_svc;Password=pomo_pw

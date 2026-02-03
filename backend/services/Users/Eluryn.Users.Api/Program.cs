@@ -8,14 +8,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto |
-        ForwardedHeaders.XForwardedHost;
+        ForwardedHeaders.XForwardedFor | // forward client IP
+        ForwardedHeaders.XForwardedProto | // forward original scheme (https)
+        ForwardedHeaders.XForwardedHost; // forward original host 
 
     options.ForwardLimit = 1;
 
     // Trust Traefik IP
-    options.KnownProxies.Add(IPAddress.Parse("172.20.0.10"));
+    // options.KnownProxies.Add(IPAddress.Parse("172.20.0.10"));
+    options.KnownProxies.Add(IPAddress.Parse("172.21.0.10"));
 });
 
 
