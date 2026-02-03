@@ -12,6 +12,11 @@ RUN dotnet publish ./Eluryn.Users.Api.csproj -c Release -o /app/publish --no-res
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
+# Install curl (for health checks)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
+
 # Optional but nice: run as non-root
 RUN useradd -m -u 10001 -s /usr/sbin/nologin eluryn
 USER eluryn

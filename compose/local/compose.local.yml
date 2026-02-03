@@ -36,6 +36,11 @@ services:
       - ../../certs:/certs:ro
   db:
     image: postgres:16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d eluryn"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     networks:
       - internal
     environment:
@@ -53,7 +58,8 @@ services:
     networks:
       - internal
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command:
       [
         "-url=jdbc:postgresql://db:5432/eluryn",
@@ -71,7 +77,8 @@ services:
     networks:
       - internal
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command:
       [
         "-url=jdbc:postgresql://db:5432/eluryn",
@@ -96,6 +103,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
     labels:
       - traefik.enable=true
       # creates a router named "users" that listens to api.localhost/users
@@ -119,6 +132,12 @@ services:
       # Enables TLS termination for this router
       - traefik.http.routers.users.tls=true
 
+      # Important detail: this healthcheck is from Traefik → service over the internal Docker network, so the path should be /health (NOT /users/health), because Traefik is calling the backend directly.
+      - traefik.http.services.users.loadbalancer.healthcheck.path=/health
+      - traefik.http.services.users.loadbalancer.healthcheck.interval=10s
+      - traefik.http.services.users.loadbalancer.healthcheck.timeout=2s
+      - traefik.http.services.users.loadbalancer.healthcheck.scheme=http
+
   pomotimer-api:
     build:
       context: ../../backend/services/Pomotimer/Eluryn.Pomotimer.Api
@@ -131,6 +150,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
     labels:
       - traefik.enable=true
       - traefik.http.routers.pomotimer.rule=Host(`api.localhost`) && PathPrefix(`/pomotimer`)
@@ -145,6 +170,12 @@ services:
 
       - traefik.http.routers.pomotimer.entrypoints=websecure
       - traefik.http.routers.pomotimer.tls=true
+
+      # Important detail: this healthcheck is from Traefik → service over the internal Docker network, so the path should be /health (NOT /users/health), because Traefik is calling the backend directly.
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.path=/health
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.interval=10s
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.timeout=2s
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.scheme=http
 
       - traefik.http.services.pomotimer.loadbalancer.server.port=8080
 
