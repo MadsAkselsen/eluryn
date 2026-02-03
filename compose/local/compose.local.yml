@@ -34,6 +34,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
       - ../../certs:/certs:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   db:
     image: postgres:16
     healthcheck:
@@ -52,6 +57,11 @@ services:
     volumes:
       - eluryn-db:/var/lib/postgresql/data
       - ./local.db.init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   flyway-users:
     image: flyway/flyway:11.20.1
@@ -109,6 +119,11 @@ services:
       timeout: 2s
       retries: 5
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     labels:
       - traefik.enable=true
       # creates a router named "users" that listens to api.localhost/users
@@ -156,6 +171,11 @@ services:
       timeout: 2s
       retries: 5
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     labels:
       - traefik.enable=true
       - traefik.http.routers.pomotimer.rule=Host(`api.localhost`) && PathPrefix(`/pomotimer`)
