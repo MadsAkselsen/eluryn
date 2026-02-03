@@ -4,44 +4,29 @@ A local development environment is set up using Docker Compose.
 
 ## Run, stop, restart
 
-#### Start everything (with frontend watch mode)
+<!-- #### Start everything (with frontend watch mode) -->
 
-```bash
-docker compose -f compose/compose.local.yml watch
-```
+<!-- ```bash
+docker compose -f compose/local/compose.local.yml watch
+``` -->
 
 #### Stop all containers (clean shutdown)
 
 ```bash
-docker compose -f compose/compose.local.yml down
-```
-
-#### Restart the frontend (keeps watch mode):
-
-```bash
-docker compose -f compose/compose.local.yml restart frontend
+docker compose -p eluryn -f compose/local/compose.local.yml down
 ```
 
 #### Restart a backend service:
 
 ```bash
-docker compose -f compose/compose.local.yml restart users-api
-docker compose -f compose/compose.local.yml restart pomotimer-api
+docker compose -p eluryn -f compose/local/compose.local.yml restart users-api
+docker compose -p eluryn -f compose/local/compose.local.yml restart pomotimer-api
 ```
 
-#### Rebuild everything (without deleting data) - useful if you changed the dockerfile
+#### Full reset (wipe DBs and rebuild everything - but not deleting DBs)
 
 ```bash
-docker compose -f compose/compose.local.yml build --no-cache
-docker compose -f compose/compose.local.yml watch
-```
-
-#### Full reset (wipe DBs and rebuild everything)
-
-```bash
-docker compose -f compose/compose.local.yml down -v
-docker compose -f compose/compose.local.yml build --no-cache
-docker compose -f compose/compose.local.yml watch
+docker compose -p eluryn -f ./compose/local/compose.local.yml down --remove-orphans && docker network rm eluryn-edge eluryn-internal 2>/dev/null || true && docker compose -p eluryn -f ./compose/local/compose.local.yml up --build
 ```
 
 ## Debugging and logs
@@ -49,20 +34,20 @@ docker compose -f compose/compose.local.yml watch
 #### Show container status:
 
 ```bash
-docker compose -f compose/compose.local.yml ps
+docker compose -p eluryn -f compose/local/compose.local.yml ps
 ```
 
 #### View logs for a specific service:
 
 ```bash
-docker compose -f compose/compose.local.yml logs -f frontend
+docker compose -p eluryn -f compose/local/compose.local.yml logs -f --tail=200 users-api
 ```
 
 ## Tests
 
-#### Run E2E playwright tests same way as in pipeline
+<!-- #### Run E2E playwright tests same way as in pipeline
 
 ```bash
-docker compose -f compose/compose.local.yml -f compose/compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
-```
+docker compose -f compose/local/compose.local.yml -f compose/local/compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
+``` -->
 
