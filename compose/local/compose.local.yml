@@ -8,6 +8,19 @@ services:
         ipv4_address: 172.21.0.10
     security_opt:
       - no-new-privileges:true
+    labels:
+      - traefik.enable=true
+
+      # Define security headers middleware
+      - traefik.http.middlewares.sec-headers.headers.framedeny=true # Meaning: your site can’t be embedded in an <iframe> anywhere
+      - traefik.http.middlewares.sec-headers.headers.contenttypenosniff=true # Protects against MIME type sniffing vulnerabilities
+      - traefik.http.middlewares.sec-headers.headers.referrerpolicy=no-referrer
+      - traefik.http.middlewares.sec-headers.headers.permissionspolicy=geolocation=(),microphone=(),camera=()
+
+      # HSTS (prod only — don’t do this on localhost)
+      # - traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000
+      # - traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true
+      # - traefik.http.middlewares.sec-headers.headers.stsPreload=true
     command:
       # when routing to containers, use the edge network IPs
       - --providers.docker.network=eluryn-internal
@@ -156,6 +169,9 @@ services:
       - traefik.http.services.users.loadbalancer.healthcheck.timeout=2s
       - traefik.http.services.users.loadbalancer.healthcheck.scheme=http
 
+      # Attach security headers middleware
+      - traefik.http.routers.users.middlewares=sec-headers@docker,users-stripprefix@docker
+
   pomotimer-api:
     build:
       context: ../../backend/services/Pomotimer/Eluryn.Pomotimer.Api
@@ -202,6 +218,9 @@ services:
       - traefik.http.services.pomotimer.loadbalancer.healthcheck.scheme=http
 
       - traefik.http.services.pomotimer.loadbalancer.server.port=8080
+
+      # Attach security headers middleware
+      - traefik.http.routers.pomotimer.middlewares=sec-headers@docker,pomotimer-stripprefix@docker
 
   # frontend:
   #   build:
