@@ -64,7 +64,7 @@ services:
         max-file: "3"
 
   flyway-users:
-    image: flyway/flyway:11.20.1
+    image: flyway/flyway:12.0.0
     networks:
       - internal
     depends_on:
@@ -77,13 +77,14 @@ services:
         "-password=users_pw",
         "-connectRetries=30",
         "-schemas=users",
+        "-locations=filesystem:/flyway/sql",
         "migrate"
       ]
     volumes:
       - ../../backend/services/Users/Eluryn.Users.Api/migrations:/flyway/sql:ro
 
   flyway-pomotimer:
-    image: flyway/flyway:11.20.1
+    image: flyway/flyway:12.0.0
     networks:
       - internal
     depends_on:
@@ -96,6 +97,7 @@ services:
         "-password=pomo_pw",
         "-connectRetries=30",
         "-schemas=pomotimer",
+        "-locations=filesystem:/flyway/sql",
         "migrate"
       ]
     volumes:

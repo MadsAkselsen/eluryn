@@ -22,9 +22,6 @@ RUN useradd -m -u 10001 -s /usr/sbin/nologin eluryn
 USER eluryn
 
 COPY --from=build /app/publish ./
-
-# ASP.NET Core defaults to 8080 in containers (good with compose mapping)
-ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "Eluryn.Users.Api.dll"]
