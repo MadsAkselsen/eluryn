@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:v3
+    image: traefik:v3.6.7
     networks:
       edge:
         ipv4_address: 172.20.0.10 # static IP for traefik in edge network so backend services can add it to known proxies
@@ -107,7 +107,8 @@ services:
     build:
       context: ../../backend/services/Users/Eluryn.Users.Api
     depends_on:
-      - flyway-users
+      flyway-users: 
+        condition: service_completed_successfully
     networks:
       - internal
     environment:
@@ -159,7 +160,8 @@ services:
     build:
       context: ../../backend/services/Pomotimer/Eluryn.Pomotimer.Api
     depends_on:
-      - flyway-pomotimer
+      flyway-pomotimer: 
+        condition: service_completed_successfully
     networks:
       - internal
     environment:
