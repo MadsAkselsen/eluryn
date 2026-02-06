@@ -14,7 +14,7 @@ services:
       # Define security headers middleware
       - traefik.http.middlewares.sec-headers.headers.framedeny=true # Meaning: your site can’t be embedded in an <iframe> anywhere
       - traefik.http.middlewares.sec-headers.headers.contenttypenosniff=true # Protects against MIME type sniffing vulnerabilities
-      - traefik.http.middlewares.sec-headers.headers.referrerpolicy=no-referrer
+      - traefik.http.middlewares.sec-headers.headers.referrerpolicy=no-referrer # No referrer information is sent along with requests
       - traefik.http.middlewares.sec-headers.headers.permissionspolicy=geolocation=(),microphone=(),camera=()
 
       # HSTS (prod only — don’t do this on localhost)
