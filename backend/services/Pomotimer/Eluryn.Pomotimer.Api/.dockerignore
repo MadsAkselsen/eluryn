@@ -7,3 +7,5 @@
 *.suo
 Dockerfile
 docker-compose*.yml
+.vs/
+*.DS_Store
