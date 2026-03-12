@@ -82,7 +82,7 @@ services:
       - internal
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
     command:
       [
         "-url=jdbc:postgresql://db:5432/eluryn",
@@ -102,7 +102,7 @@ services:
       - internal
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
     command:
       [
         "-url=jdbc:postgresql://db:5432/eluryn",

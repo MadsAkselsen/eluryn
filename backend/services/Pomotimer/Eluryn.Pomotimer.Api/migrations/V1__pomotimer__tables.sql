@@ -22,8 +22,8 @@ create table if not exists pomodoro_sessions (
   id uuid primary key,
   user_id uuid not null,
 
-  status pomodoro_session_status not null,
-  current_interval_type pomodoro_interval_type not null,
+  status text not null,
+  current_interval_type text not null,
   phase int not null,
 
   start_time_utc timestamptz,
@@ -45,7 +45,7 @@ create table if not exists focus_log_entries (
   session_id uuid not null
     references pomodoro_sessions(id) on delete cascade,
 
-  interval_type pomodoro_interval_type not null,
+  interval_type text not null,
   started_at_utc timestamptz not null,
   ended_at_utc timestamptz,
   duration_seconds int not null,

@@ -36,8 +36,8 @@ erDiagram
     POMOTIMER__POMODORO_SESSIONS {
         uuid id PK
         uuid user_id  "logical ref -> users.users.id (no FK)"
-        enum pomodoro_session_status
-        enum pomodoro_interval_type "current_interval_type"
+        enum text
+        enum text "current_interval_type"
         int phase
         datetime start_time_utc
         datetime paused_at_utc
@@ -54,7 +54,7 @@ erDiagram
         uuid id PK
         uuid user_id  "logical ref -> users.users.id (no FK)"
         uuid session_id FK
-        enum pomodoro_interval_type
+        enum text
         datetime started_at_utc
         datetime ended_at_utc
         int duration_seconds
