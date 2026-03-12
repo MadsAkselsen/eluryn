@@ -8,5 +8,5 @@ export type WeatherForecast = {
 };
 
 export function getWeatherForecast() {
-  return apiGet<WeatherForecast[]>("/users/weatherforecast");
+  return apiGet<WeatherForecast[]>("/pomotimer/weatherforecast");
 }
