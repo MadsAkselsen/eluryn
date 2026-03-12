@@ -22,7 +22,7 @@ services:
       # - traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true
       # - traefik.http.middlewares.sec-headers.headers.stsPreload=true
     command:
-      # when routing to containers, use the edge network IPs
+      # when routing to containers, use the internal network IPs
       - --providers.docker.network=eluryn-internal
       - --api.insecure=true
       - --providers.docker=true
@@ -155,8 +155,11 @@ services:
       - traefik.http.middlewares.users-cors.headers.accesscontrolallowheaders=*
       - traefik.http.middlewares.users-cors.headers.addvaryheader=true
 
-      # Attaches both middlewares to the router, in that order
-      - traefik.http.routers.users.middlewares=users-stripprefix,users-cors
+      # Router middleware chain (executed in order):
+      # - sec-headers: add common security headers
+      # - users-stripprefix: remove /users before forwarding to backend
+      # - users-cors: allow frontend (localhost:5173) to call the API
+      - traefik.http.routers.users.middlewares=sec-headers@docker,users-stripprefix@docker,users-cors@docker
 
       # This router listens on HTTPS only (port 443 entrypoint) 
       - traefik.http.routers.users.entrypoints=websecure
@@ -170,7 +173,7 @@ services:
       - traefik.http.services.users.loadbalancer.healthcheck.scheme=http
 
       # Attach security headers middleware
-      - traefik.http.routers.users.middlewares=sec-headers@docker,users-stripprefix@docker
+      # - traefik.http.routers.users.middlewares=sec-headers@docker,users-stripprefix@docker
 
   pomotimer-api:
     build:
@@ -206,7 +209,13 @@ services:
       - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowheaders=*
       - traefik.http.middlewares.pomotimer-cors.headers.addvaryheader=true
 
-      - traefik.http.routers.pomotimer.middlewares=pomotimer-stripprefix,pomotimer-cors
+      # Attach middlewares to the router.
+      # Order matters:
+      # 1. sec-headers → add security headers to the response
+      # 2. pomotimer-stripprefix → remove /pomotimer before forwarding to the service
+      # 3. pomotimer-cors → allow browser requests from the frontend (local dev)
+      # "@docker" specifies that the middleware is defined via Docker labels.
+      - traefik.http.routers.pomotimer.middlewares=sec-headers@docker,pomotimer-stripprefix@docker,pomotimer-cors@docker
 
       - traefik.http.routers.pomotimer.entrypoints=websecure
       - traefik.http.routers.pomotimer.tls=true
@@ -218,9 +227,6 @@ services:
       - traefik.http.services.pomotimer.loadbalancer.healthcheck.scheme=http
 
       - traefik.http.services.pomotimer.loadbalancer.server.port=8080
-
-      # Attach security headers middleware
-      - traefik.http.routers.pomotimer.middlewares=sec-headers@docker,pomotimer-stripprefix@docker
 
   # frontend:
   #   build:
