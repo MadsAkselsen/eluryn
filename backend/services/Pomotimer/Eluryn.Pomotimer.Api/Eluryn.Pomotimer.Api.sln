@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Eluryn.Pomotimer.Api", "Eluryn.Pomotimer.Api.csproj", "{2A3D0017-040F-9394-30E1-14C87F2E4821}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2A3D0017-040F-9394-30E1-14C87F2E4821}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A3D0017-040F-9394-30E1-14C87F2E4821}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A3D0017-040F-9394-30E1-14C87F2E4821}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A3D0017-040F-9394-30E1-14C87F2E4821}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C6DD8839-2F8B-42F0-BA60-F15699D88D95}
+	EndGlobalSection
+EndGlobal
