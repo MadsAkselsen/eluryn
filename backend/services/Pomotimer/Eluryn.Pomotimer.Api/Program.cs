@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Eluryn.Pomotimer.Api.Data;
+using Eluryn.Pomotimer.Api.Repositories;
+using Eluryn.Pomotimer.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,9 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<PomotimerDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 
+// Dependency injection
+builder.Services.AddScoped<IPomodoroSettingsRepository, PomodoroSettingsRepository>();
+builder.Services.AddScoped<IPomodoroSettingsService, PomodoroSettingsService>();
 
 var app = builder.Build();
 
