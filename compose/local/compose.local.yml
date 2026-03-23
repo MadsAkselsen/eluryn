@@ -61,6 +61,7 @@ services:
       retries: 20
     networks:
       - internal
+      - edge # exposed on edge for access to db from Dbeaver. Should not be on edge in production!
     environment:
       POSTGRES_DB: eluryn
       POSTGRES_USER: postgres
