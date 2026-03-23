@@ -1,9 +1,4 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
-using Microsoft.EntityFrameworkCore;
-using Eluryn.Pomotimer.Api.Data;
-using Eluryn.Pomotimer.Api.Repositories;
-using Eluryn.Pomotimer.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

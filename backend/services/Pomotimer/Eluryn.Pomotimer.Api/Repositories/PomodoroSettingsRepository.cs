@@ -1,17 +1,8 @@
-using Eluryn.Pomotimer.Api.Data;
-using Eluryn.Pomotimer.Api.Entities;
-using Microsoft.EntityFrameworkCore;
-
 namespace Eluryn.Pomotimer.Api.Repositories;
 
-public class PomodoroSettingsRepository : IPomodoroSettingsRepository
+public class PomodoroSettingsRepository(PomotimerDbContext dbContext) : IPomodoroSettingsRepository
 {
-    private readonly PomotimerDbContext _dbContext;
-
-    public PomodoroSettingsRepository(PomotimerDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    private readonly PomotimerDbContext _dbContext = dbContext;
 
     public Task<PomodoroSettings?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken)
     {

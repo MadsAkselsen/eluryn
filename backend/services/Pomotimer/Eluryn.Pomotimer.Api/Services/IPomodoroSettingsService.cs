@@ -1,5 +1,3 @@
-using Eluryn.Pomotimer.Api.Dtos;
-
 namespace Eluryn.Pomotimer.Api.Services;
 
 public interface IPomodoroSettingsService
