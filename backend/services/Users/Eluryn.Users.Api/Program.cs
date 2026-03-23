@@ -1,84 +1,52 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
+using Eluryn.Users.Api.Data;
+using Eluryn.Users.Api.Repositories;
+using Eluryn.Users.Api.Services;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor | // forward client IP
-        ForwardedHeaders.XForwardedProto | // forward original scheme (https)
-        ForwardedHeaders.XForwardedHost; // forward original host 
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto |
+        ForwardedHeaders.XForwardedHost;
 
     options.ForwardLimit = 1;
-
-    // Trust Traefik IP
-    // options.KnownProxies.Add(IPAddress.Parse("172.20.0.10"));
     options.KnownProxies.Add(IPAddress.Parse("172.21.0.10"));
 });
 
-
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+
+builder.Services.AddDbContext<UsersDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
+
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 var app = builder.Build();
 
+app.Logger.LogInformation("===== PROGRAM RELOADED 123 =====");
+
+app.Logger.LogInformation(
+    "Users API starting up. Env={Environment}",
+    app.Environment.EnvironmentName);
+
+var conn = builder.Configuration.GetConnectionString("Db");
+app.Logger.LogInformation("DB configured: {HasConnectionString}", !string.IsNullOrWhiteSpace(conn));
+
 app.UseForwardedHeaders();
 
-app.Logger.LogInformation("Users API starting up. Env={Env}", app.Environment.EnvironmentName);
-
-
-
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-if (!app.Environment.IsDevelopment())
-{
-    // app.UseHttpsRedirection();
-}
-
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", (HttpContext ctx) =>
-{
-    var xff = ctx.Request.Headers["X-Forwarded-For"].ToString();
-    var xreal = ctx.Request.Headers["X-Real-Ip"].ToString();
-    var xorigFor = ctx.Request.Headers["X-Original-For"].ToString();
-    var forwarded = ctx.Request.Headers["Forwarded"].ToString();
-
-    app.Logger.LogInformation("RemoteIp={RemoteIp} Scheme={Scheme}", 
-        ctx.Connection.RemoteIpAddress?.ToString(), ctx.Request.Scheme);
-
-    app.Logger.LogInformation("XFF='{XFF}' X-Real-Ip='{XRealIp}' X-Original-For='{XOrigFor}' Forwarded='{Forwarded}'",
-        xff, xreal, xorigFor, forwarded);
-
-
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.MapControllers();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

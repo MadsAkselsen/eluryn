@@ -1,7 +1,3 @@
-using Eluryn.Pomotimer.Api.Dtos;
-using Eluryn.Pomotimer.Api.Entities;
-using Eluryn.Pomotimer.Api.Repositories;
-
 namespace Eluryn.Pomotimer.Api.Services;
 
 public class PomodoroSettingsService(IPomodoroSettingsRepository repository) : IPomodoroSettingsService

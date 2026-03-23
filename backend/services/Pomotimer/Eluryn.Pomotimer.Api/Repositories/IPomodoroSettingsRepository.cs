@@ -1,5 +1,3 @@
-using Eluryn.Pomotimer.Api.Entities;
-
 namespace Eluryn.Pomotimer.Api.Repositories;
 
 public interface IPomodoroSettingsRepository
