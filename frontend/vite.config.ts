@@ -1,43 +1,46 @@
 import { fileURLToPath, URL } from 'node:url'
-import fs from "node:fs";
+import fs from 'node:fs'
+import path from 'node:path'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
-
 import tailwindcss from '@tailwindcss/vite'
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [
-    vue(),
-    vueDevTools(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    },
-  },
-  server: {
-    https: {
-      key: fs.readFileSync("../certs/local-key.pem"),
-      cert: fs.readFileSync("../certs/local-cert.pem"),
-    },
-    port: 5173,
-  },
+export default defineConfig(({ command }) => {
+  const isDevServer = command === 'serve'
 
-  // This was for running inside a container with Traefik
-  // server: {
-  //   host: true, // listen on 0.0.0.0 in container
-  //   port: 5173,
-  //   strictPort: true,
+  const keyPath = path.resolve(__dirname, '../certs/local-key.pem')
+  const certPath = path.resolve(__dirname, '../certs/local-cert.pem')
 
-  //   // 👇 this is the important part for Traefik
-  //   hmr: {
-  //     host: "app.localhost",
-  //     protocol: "ws",
-  //     clientPort: 80,
-  //   },
-  // },
+  const hasLocalCerts =
+    fs.existsSync(keyPath) && fs.existsSync(certPath)
+
+  const server = !isDevServer
+    ? undefined
+    : hasLocalCerts
+      ? {
+          https: {
+            key: fs.readFileSync(keyPath),
+            cert: fs.readFileSync(certPath),
+          },
+          port: 5173,
+        }
+      : {
+          port: 5173,
+        }
+
+  return {
+    plugins: [
+      vue(),
+      vueDevTools(),
+      tailwindcss(),
+    ],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
+    server,
+  }
 })
