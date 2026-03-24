@@ -1,6 +1,9 @@
+using Eluryn.Pomotimer.Api.Entities;
+using Microsoft.EntityFrameworkCore;
+
 namespace Eluryn.Pomotimer.Api.Data;
 
-public class PomotimerDbContext(DbContextOptions<PomotimerDbContext> options) : DbContext(options), DbContext
+public class PomotimerDbContext(DbContextOptions<PomotimerDbContext> options) : DbContext(options)
 {
     public DbSet<PomodoroSettings> PomodoroSettings => Set<PomodoroSettings>();
     public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();

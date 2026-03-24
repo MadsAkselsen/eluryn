@@ -1,3 +1,7 @@
+using Eluryn.Pomotimer.Api.Data;
+using Eluryn.Pomotimer.Api.Entities;
+using Microsoft.EntityFrameworkCore;
+
 namespace Eluryn.Pomotimer.Api.Repositories;
 
 public class PomodoroSettingsRepository(PomotimerDbContext dbContext) : IPomodoroSettingsRepository
