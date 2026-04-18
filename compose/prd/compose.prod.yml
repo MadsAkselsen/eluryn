@@ -16,24 +16,24 @@ services:
       - traefik.http.middlewares.sec-headers.headers.permissionspolicy=geolocation=(),microphone=(),camera=()
     command:
       - --providers.docker.network=eluryn-internal
-      - --api.insecure=true # remove later after deplyment is working
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --entrypoints.websecure.http.tls=true
-      - --providers.file.directory=/etc/traefik/dynamic
-      - --providers.file.watch=true
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --accesslog=true
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - traefik-letsencrypt:/letsencrypt
     logging:
       driver: "json-file"
       options:
@@ -42,8 +42,7 @@ services:
     restart: unless-stopped
 
   users-api:
-    build:
-      context: ../../backend/services/Users/Eluryn.Users.Api
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/eluryn-users-api:${IMAGE_TAG}
     networks:
       - internal
     environment:
@@ -75,6 +74,7 @@ services:
       - traefik.http.routers.users.middlewares=sec-headers@docker,users-stripprefix@docker,users-cors@docker
       - traefik.http.routers.users.entrypoints=websecure
       - traefik.http.routers.users.tls=true
+      - traefik.http.routers.users.tls.certresolver=letsencrypt
       - traefik.http.services.users.loadbalancer.healthcheck.path=/health
       - traefik.http.services.users.loadbalancer.healthcheck.interval=10s
       - traefik.http.services.users.loadbalancer.healthcheck.timeout=2s
@@ -82,8 +82,7 @@ services:
     restart: unless-stopped
 
   pomotimer-api:
-    build:
-      context: ../../backend/services/Pomotimer/Eluryn.Pomotimer.Api
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/eluryn-pomotimer-api:${IMAGE_TAG}
     networks:
       - internal
     environment:
@@ -114,6 +113,7 @@ services:
       - traefik.http.routers.pomotimer.middlewares=sec-headers@docker,pomotimer-stripprefix@docker,pomotimer-cors@docker
       - traefik.http.routers.pomotimer.entrypoints=websecure
       - traefik.http.routers.pomotimer.tls=true
+      - traefik.http.routers.pomotimer.tls.certresolver=letsencrypt
       - traefik.http.services.pomotimer.loadbalancer.healthcheck.path=/health
       - traefik.http.services.pomotimer.loadbalancer.healthcheck.interval=10s
       - traefik.http.services.pomotimer.loadbalancer.healthcheck.timeout=2s
@@ -122,9 +122,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ../../frontend
-      dockerfile: Dockerfile.prd
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/eluryn-frontend:${IMAGE_TAG}
     depends_on:
       - users-api
       - pomotimer-api
@@ -135,9 +133,44 @@ services:
       - traefik.http.routers.frontend.rule=Host(`${APP_HOST}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls=true
+      - traefik.http.routers.frontend.tls.certresolver=letsencrypt
       - traefik.http.services.frontend.loadbalancer.server.port=80
       - traefik.http.routers.frontend.middlewares=sec-headers@docker
     restart: unless-stopped
+
+  flyway-users:
+    image: flyway/flyway:11-alpine
+    profiles: ["migrations"]
+    networks:
+      - internal
+    volumes:
+      - ./migrations/users:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
+      FLYWAY_USER: ${USERS_DB_USER}
+      FLYWAY_PASSWORD: ${USERS_DB_PASSWORD}
+      FLYWAY_SCHEMAS: users
+      FLYWAY_DEFAULT_SCHEMA: users
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      FLYWAY_CONNECT_RETRIES: 10
+    command: migrate
+
+  flyway-pomotimer:
+    image: flyway/flyway:11-alpine
+    profiles: ["migrations"]
+    networks:
+      - internal
+    volumes:
+      - ./migrations/pomotimer:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
+      FLYWAY_USER: ${POMOTIMER_DB_USER}
+      FLYWAY_PASSWORD: ${POMOTIMER_DB_PASSWORD}
+      FLYWAY_SCHEMAS: pomotimer
+      FLYWAY_DEFAULT_SCHEMA: pomotimer
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      FLYWAY_CONNECT_RETRIES: 10
+    command: migrate
 
 networks:
   edge:
@@ -148,7 +181,9 @@ networks:
 
   internal:
     name: eluryn-internal
-    internal: true
     ipam:
       config:
         - subnet: 172.21.0.0/16
+
+volumes:
+  traefik-letsencrypt:
