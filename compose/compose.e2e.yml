@@ -1,0 +1,30 @@
+services:
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.57.0-noble
+    working_dir: /work
+    init: true
+    ipc: host
+
+    # Only add this if you get weird Chromium launch errors locally.
+    # cap_add:
+    #   - SYS_ADMIN
+
+    depends_on:
+      - frontend
+
+    environment:
+      # Your tests should use this
+      BASE_URL: http://frontend:5173
+
+      # Recommended for CI-like behavior
+      CI: "true"
+
+    volumes:
+      # mount the frontend repo that contains the Playwright tests
+      - ../frontend:/work
+
+      # keep reports on your host machine
+      - ../frontend/playwright-report:/work/playwright-report
+      - ../frontend/test-results:/work/test-results
+
+    command: ["npx", "playwright", "test"]

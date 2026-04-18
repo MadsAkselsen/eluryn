@@ -1,10 +1,25 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
+
+import { getWeatherForecast, type WeatherForecast } from "@/api/users";
+import { onMounted, ref } from 'vue';
+
+const forecasts = ref<WeatherForecast[]>([]);
+const error = ref<string | null>(null);
+
+onMounted(async () => {
+  try {
+    forecasts.value = await getWeatherForecast();
+  } catch (e) {
+    error.value = (e as Error).message;
+  }
+});
+
 </script>
 
 <template>
-  <header>
+  <header class="bg-blue-500 p-10 text-white">
     <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
 
     <div class="wrapper">
