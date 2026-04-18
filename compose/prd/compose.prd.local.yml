@@ -52,6 +52,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
+      ReverseProxy__TrustedProxy: 172.21.0.10
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
       interval: 10s
@@ -91,6 +92,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
+      ReverseProxy__TrustedProxy: 172.21.0.10
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
       interval: 10s
@@ -151,5 +153,4 @@ networks:
         - subnet: 172.21.0.0/16
 
   db-shared:
-    external: true
     name: eluryn-db-shared
