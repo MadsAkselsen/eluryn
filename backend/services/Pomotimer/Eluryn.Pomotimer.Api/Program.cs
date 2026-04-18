@@ -16,21 +16,20 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
     options.ForwardLimit = 1;
 
-    // Trust Traefik IP
-    options.KnownProxies.Add(IPAddress.Parse("172.21.0.10"));
+    var trustedProxy = builder.Configuration["ReverseProxy:TrustedProxy"];
+    if (!string.IsNullOrWhiteSpace(trustedProxy))
+    {
+        options.KnownProxies.Add(IPAddress.Parse(trustedProxy));
+    }
 });
 
 // OpenAPI
 builder.Services.AddOpenApi();
-
-// Controllers
 builder.Services.AddControllers();
 
-// EF Core
 builder.Services.AddDbContext<PomotimerDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Db")));
 
-// Dependency injection
 builder.Services.AddScoped<IPomodoroSettingsRepository, PomodoroSettingsRepository>();
 builder.Services.AddScoped<IPomodoroSettingsService, PomodoroSettingsService>();
 
@@ -44,7 +43,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-
 app.MapControllers();
 
 app.Run();
