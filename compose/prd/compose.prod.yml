@@ -1,0 +1,154 @@
+services:
+  traefik:
+    image: traefik:v3.6.7
+    networks:
+      edge:
+        ipv4_address: 172.20.0.10
+      internal:
+        ipv4_address: 172.21.0.10
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.sec-headers.headers.framedeny=true
+      - traefik.http.middlewares.sec-headers.headers.contenttypenosniff=true
+      - traefik.http.middlewares.sec-headers.headers.referrerpolicy=no-referrer
+      - traefik.http.middlewares.sec-headers.headers.permissionspolicy=geolocation=(),microphone=(),camera=()
+    command:
+      - --providers.docker.network=eluryn-internal
+      - --api.insecure=true # remove later after deplyment is working
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --accesslog=true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  users-api:
+    build:
+      context: ../../backend/services/Users/Eluryn.Users.Api
+    networks:
+      - internal
+    environment:
+      ConnectionStrings__Db: Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${USERS_DB_USER};Password=${USERS_DB_PASSWORD};Ssl Mode=Require;Trust Server Certificate=true
+      ASPNETCORE_ENVIRONMENT: Production
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+      ReverseProxy__TrustedProxy: 172.21.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.users.rule=Host(`${API_HOST}`) && PathPrefix(`/users`)
+      - traefik.http.middlewares.users-stripprefix.stripprefix.prefixes=/users
+      - traefik.http.services.users.loadbalancer.server.port=8080
+      - traefik.http.middlewares.users-cors.headers.accesscontrolalloworiginlist=https://${APP_HOST}
+      - traefik.http.middlewares.users-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH
+      - traefik.http.middlewares.users-cors.headers.accesscontrolallowheaders=*
+      - traefik.http.middlewares.users-cors.headers.addvaryheader=true
+      - traefik.http.routers.users.middlewares=sec-headers@docker,users-stripprefix@docker,users-cors@docker
+      - traefik.http.routers.users.entrypoints=websecure
+      - traefik.http.routers.users.tls=true
+      - traefik.http.services.users.loadbalancer.healthcheck.path=/health
+      - traefik.http.services.users.loadbalancer.healthcheck.interval=10s
+      - traefik.http.services.users.loadbalancer.healthcheck.timeout=2s
+      - traefik.http.services.users.loadbalancer.healthcheck.scheme=http
+    restart: unless-stopped
+
+  pomotimer-api:
+    build:
+      context: ../../backend/services/Pomotimer/Eluryn.Pomotimer.Api
+    networks:
+      - internal
+    environment:
+      ConnectionStrings__Db: Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${POMOTIMER_DB_USER};Password=${POMOTIMER_DB_PASSWORD};Ssl Mode=Require;Trust Server Certificate=true
+      ASPNETCORE_ENVIRONMENT: Production
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+      ReverseProxy__TrustedProxy: 172.21.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pomotimer.rule=Host(`${API_HOST}`) && PathPrefix(`/pomotimer`)
+      - traefik.http.middlewares.pomotimer-stripprefix.stripprefix.prefixes=/pomotimer
+      - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolalloworiginlist=https://${APP_HOST}
+      - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH
+      - traefik.http.middlewares.pomotimer-cors.headers.accesscontrolallowheaders=*
+      - traefik.http.middlewares.pomotimer-cors.headers.addvaryheader=true
+      - traefik.http.routers.pomotimer.middlewares=sec-headers@docker,pomotimer-stripprefix@docker,pomotimer-cors@docker
+      - traefik.http.routers.pomotimer.entrypoints=websecure
+      - traefik.http.routers.pomotimer.tls=true
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.path=/health
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.interval=10s
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.timeout=2s
+      - traefik.http.services.pomotimer.loadbalancer.healthcheck.scheme=http
+      - traefik.http.services.pomotimer.loadbalancer.server.port=8080
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.prd
+    depends_on:
+      - users-api
+      - pomotimer-api
+    networks:
+      - internal
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.routers.frontend.tls=true
+      - traefik.http.services.frontend.loadbalancer.server.port=80
+      - traefik.http.routers.frontend.middlewares=sec-headers@docker
+    restart: unless-stopped
+
+networks:
+  edge:
+    name: eluryn-edge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+  internal:
+    name: eluryn-internal
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
