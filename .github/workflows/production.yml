@@ -1,0 +1,228 @@
+name: Production
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  FRONTEND_IMAGE: eluryn-frontend
+  USERS_API_IMAGE: eluryn-users-api
+  POMOTIMER_API_IMAGE: eluryn-pomotimer-api
+  IMAGE_TAG: sha-${{ github.sha }}
+
+jobs:
+  build:
+    name: Test, build, and publish images
+    runs-on: ubuntu-latest
+    outputs:
+      image_namespace: ${{ steps.names.outputs.image_namespace }}
+      image_tag: ${{ steps.names.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image namespace
+        id: names
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_namespace="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE_NAMESPACE=${image_namespace}" >> "$GITHUB_ENV"
+          echo "image_namespace=${image_namespace}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check and build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm run test:unit -- --run
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore users API
+        working-directory: backend
+        run: dotnet restore services/Users/Eluryn.Users.Api/Eluryn.Users.Api.csproj
+
+      - name: Build users API
+        working-directory: backend
+        run: dotnet build services/Users/Eluryn.Users.Api/Eluryn.Users.Api.csproj --configuration Release --no-restore
+
+      - name: Restore pomotimer API
+        working-directory: backend
+        run: dotnet restore services/Pomotimer/Eluryn.Pomotimer.Api/Eluryn.Pomotimer.Api.csproj
+
+      - name: Build pomotimer API
+        working-directory: backend
+        run: dotnet build services/Pomotimer/Eluryn.Pomotimer.Api/Eluryn.Pomotimer.Api.csproj --configuration Release --no-restore
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.prd
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.names.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE }}:${{ steps.names.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ steps.names.outputs.image_namespace }}/${{ env.FRONTEND_IMAGE }}:main
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Build users API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/services/Users/Eluryn.Users.Api
+          file: ./backend/services/Users/Eluryn.Users.Api/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.names.outputs.image_namespace }}/${{ env.USERS_API_IMAGE }}:${{ steps.names.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ steps.names.outputs.image_namespace }}/${{ env.USERS_API_IMAGE }}:main
+          cache-from: type=gha,scope=users-api
+          cache-to: type=gha,mode=max,scope=users-api
+
+      - name: Build pomotimer API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/services/Pomotimer/Eluryn.Pomotimer.Api
+          file: ./backend/services/Pomotimer/Eluryn.Pomotimer.Api/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.names.outputs.image_namespace }}/${{ env.POMOTIMER_API_IMAGE }}:${{ steps.names.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ steps.names.outputs.image_namespace }}/${{ env.POMOTIMER_API_IMAGE }}:main
+          cache-from: type=gha,scope=pomotimer-api
+          cache-to: type=gha,mode=max,scope=pomotimer-api
+
+  deploy:
+    name: Deploy to droplet
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    environment:
+      name: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_PRIVATE_KEY }}
+
+      - name: Trust droplet host key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.DROPLET_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Create deployment directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "sudo mkdir -p /opt/eluryn/migrations/users /opt/eluryn/migrations/pomotimer"
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "sudo chown -R ${{ secrets.DROPLET_USER }}:${{ secrets.DROPLET_USER }} /opt/eluryn"
+
+      - name: Upload compose, deploy script, and migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp compose/prd/compose.prod.yml "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/eluryn/compose.prod.yml"
+          scp scripts/deploy/deploy-production.sh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/eluryn/deploy-production.sh"
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "rm -rf /opt/eluryn/migrations/users/* /opt/eluryn/migrations/pomotimer/*"
+          scp backend/services/Users/Eluryn.Users.Api/migrations/*.sql "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/eluryn/migrations/users/"
+          scp backend/services/Pomotimer/Eluryn.Pomotimer.Api/migrations/*.sql "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/eluryn/migrations/pomotimer/"
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "chmod +x /opt/eluryn/deploy-production.sh"
+
+      - name: Write production env file
+        shell: bash
+        env:
+          IMAGE_REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAMESPACE: ${{ needs.build.outputs.image_namespace }}
+          IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          API_HOST: ${{ vars.API_HOST }}
+          TRAEFIK_ACME_EMAIL: ${{ vars.TRAEFIK_ACME_EMAIL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          USERS_DB_USER: ${{ vars.USERS_DB_USER }}
+          USERS_DB_PASSWORD: ${{ secrets.USERS_DB_PASSWORD }}
+          POMOTIMER_DB_USER: ${{ vars.POMOTIMER_DB_USER }}
+          POMOTIMER_DB_PASSWORD: ${{ secrets.POMOTIMER_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          {
+            printf '%s\n' "COMPOSE_PROJECT_NAME=eluryn"
+            printf '%s\n' "IMAGE_REGISTRY=${IMAGE_REGISTRY}"
+            printf '%s\n' "IMAGE_NAMESPACE=${IMAGE_NAMESPACE}"
+            printf '%s\n' "IMAGE_TAG=${IMAGE_TAG}"
+            printf '%s\n' "APP_HOST=${APP_HOST}"
+            printf '%s\n' "API_HOST=${API_HOST}"
+            printf '%s\n' "TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL}"
+            printf '%s\n' "DB_HOST=${DB_HOST}"
+            printf '%s\n' "DB_PORT=${DB_PORT}"
+            printf '%s\n' "DB_NAME=${DB_NAME}"
+            printf '%s\n' "USERS_DB_USER=${USERS_DB_USER}"
+            printf '%s\n' "USERS_DB_PASSWORD=${USERS_DB_PASSWORD}"
+            printf '%s\n' "POMOTIMER_DB_USER=${POMOTIMER_DB_USER}"
+            printf '%s\n' "POMOTIMER_DB_PASSWORD=${POMOTIMER_DB_PASSWORD}"
+          } > production.env
+
+          scp production.env "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/eluryn/.env"
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "chmod 600 /opt/eluryn/.env"
+
+      - name: Log in to GHCR on droplet
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "echo '${{ secrets.GHCR_READ_TOKEN }}' | docker login ghcr.io -u '${{ github.repository_owner }}' --password-stdin"
+
+      - name: Deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "APP_DIR=/opt/eluryn /opt/eluryn/deploy-production.sh"
