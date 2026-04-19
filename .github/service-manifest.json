@@ -1,0 +1,25 @@
+{
+  "backend_services": [
+    {
+      "id": "users",
+      "image": "eluryn-users-api",
+      "project": "backend/services/Users/Eluryn.Users.Api/Eluryn.Users.Api.csproj",
+      "docker_context": "./backend/services/Users/Eluryn.Users.Api",
+      "dockerfile": "./backend/services/Users/Eluryn.Users.Api/Dockerfile",
+      "migrations": "backend/services/Users/Eluryn.Users.Api/migrations"
+    },
+    {
+      "id": "pomotimer",
+      "image": "eluryn-pomotimer-api",
+      "project": "backend/services/Pomotimer/Eluryn.Pomotimer.Api/Eluryn.Pomotimer.Api.csproj",
+      "docker_context": "./backend/services/Pomotimer/Eluryn.Pomotimer.Api",
+      "dockerfile": "./backend/services/Pomotimer/Eluryn.Pomotimer.Api/Dockerfile",
+      "migrations": "backend/services/Pomotimer/Eluryn.Pomotimer.Api/migrations"
+    }
+  ],
+  "frontend": {
+    "image": "eluryn-frontend",
+    "docker_context": "./frontend",
+    "dockerfile": "./frontend/Dockerfile.prd"
+  }
+}

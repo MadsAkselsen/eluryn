@@ -1,0 +1,400 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - prd
+      - dev
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-target:
+    name: Resolve Target Environment
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+      branch: ${{ steps.target.outputs.branch }}
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - name: Resolve branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${{ github.event.workflow_run.head_branch }}"
+          sha="${{ github.event.workflow_run.head_sha }}"
+
+          case "${branch}" in
+            prd)
+              environment="prd"
+              ;;
+            dev)
+              environment="dev"
+              ;;
+            *)
+              echo "::error::No deployment environment is mapped for branch '${branch}'."
+              exit 1
+              ;;
+          esac
+
+          echo "environment=${environment}" >> "$GITHUB_OUTPUT"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "Resolved '${branch}' to '${environment}' at '${sha}'."
+
+  environment-settings:
+    name: Load Environment Settings
+    runs-on: ubuntu-latest
+    needs:
+      - resolve-target
+    environment:
+      name: ${{ needs.resolve-target.outputs.environment }}
+    outputs:
+      deploy_enabled: ${{ steps.settings.outputs.deploy_enabled }}
+      registry: ${{ steps.settings.outputs.registry }}
+      image_namespace: ${{ steps.settings.outputs.image_namespace }}
+      image_tag: ${{ steps.settings.outputs.image_tag }}
+      deploy_app_dir: ${{ steps.settings.outputs.deploy_app_dir }}
+      deploy_compose_source: ${{ steps.settings.outputs.deploy_compose_source }}
+      deploy_compose_file: ${{ steps.settings.outputs.deploy_compose_file }}
+      deploy_script_source: ${{ steps.settings.outputs.deploy_script_source }}
+      deploy_script_file: ${{ steps.settings.outputs.deploy_script_file }}
+      deploy_env_file: ${{ steps.settings.outputs.deploy_env_file }}
+      compose_project_name: ${{ steps.settings.outputs.compose_project_name }}
+      frontend_image: ${{ steps.manifest.outputs.frontend_image }}
+      frontend_context: ${{ steps.manifest.outputs.frontend_context }}
+      frontend_dockerfile: ${{ steps.manifest.outputs.frontend_dockerfile }}
+      backend_images: ${{ steps.manifest.outputs.backend_images }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
+
+      - name: Read service manifest
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend_images="$(jq -c '.backend_services | map({
+            id,
+            image,
+            context: .docker_context,
+            dockerfile
+          })' .github/service-manifest.json)"
+
+          echo "frontend_image=$(jq -r '.frontend.image' .github/service-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "frontend_context=$(jq -r '.frontend.docker_context' .github/service-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "frontend_dockerfile=$(jq -r '.frontend.dockerfile' .github/service-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "backend_images=${backend_images}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare settings
+        id: settings
+        shell: bash
+        env:
+          REGISTRY: ${{ vars.REGISTRY }}
+          DEPLOY_APP_DIR: ${{ vars.DEPLOY_APP_DIR }}
+          DEPLOY_COMPOSE_SOURCE: ${{ vars.DEPLOY_COMPOSE_SOURCE }}
+          DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE }}
+          DEPLOY_SCRIPT_SOURCE: ${{ vars.DEPLOY_SCRIPT_SOURCE }}
+          DEPLOY_SCRIPT_FILE: ${{ vars.DEPLOY_SCRIPT_FILE }}
+          DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE }}
+          COMPOSE_PROJECT_NAME: ${{ vars.COMPOSE_PROJECT_NAME }}
+        run: |
+          set -euo pipefail
+
+          deploy_enabled="${{ vars.DEPLOY_ENABLED }}"
+          if [ "${{ needs.resolve-target.outputs.environment }}" = "dev" ]; then
+            deploy_enabled="false"
+          elif [ -z "$deploy_enabled" ] && [ "${{ needs.resolve-target.outputs.environment }}" = "prd" ]; then
+            deploy_enabled="true"
+          fi
+
+          if [ "$deploy_enabled" = "true" ]; then
+            : "${REGISTRY:?REGISTRY environment variable is required}"
+            : "${DEPLOY_APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
+            : "${DEPLOY_COMPOSE_SOURCE:?DEPLOY_COMPOSE_SOURCE environment variable is required}"
+            : "${DEPLOY_COMPOSE_FILE:?DEPLOY_COMPOSE_FILE environment variable is required}"
+            : "${DEPLOY_SCRIPT_SOURCE:?DEPLOY_SCRIPT_SOURCE environment variable is required}"
+            : "${DEPLOY_SCRIPT_FILE:?DEPLOY_SCRIPT_FILE environment variable is required}"
+            : "${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE environment variable is required}"
+            : "${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME environment variable is required}"
+          fi
+
+          image_namespace="${GITHUB_REPOSITORY_OWNER,,}"
+          image_tag="sha-${{ needs.resolve-target.outputs.sha }}"
+
+          echo "deploy_enabled=${deploy_enabled}" >> "$GITHUB_OUTPUT"
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+          echo "image_namespace=${image_namespace}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "deploy_app_dir=${DEPLOY_APP_DIR}" >> "$GITHUB_OUTPUT"
+          echo "deploy_compose_source=${DEPLOY_COMPOSE_SOURCE}" >> "$GITHUB_OUTPUT"
+          echo "deploy_compose_file=${DEPLOY_COMPOSE_FILE}" >> "$GITHUB_OUTPUT"
+          echo "deploy_script_source=${DEPLOY_SCRIPT_SOURCE}" >> "$GITHUB_OUTPUT"
+          echo "deploy_script_file=${DEPLOY_SCRIPT_FILE}" >> "$GITHUB_OUTPUT"
+          echo "deploy_env_file=${DEPLOY_ENV_FILE}" >> "$GITHUB_OUTPUT"
+          echo "compose_project_name=${COMPOSE_PROJECT_NAME}" >> "$GITHUB_OUTPUT"
+
+  dev-placeholder:
+    name: Dev Deployment Placeholder
+    runs-on: ubuntu-latest
+    needs:
+      - resolve-target
+      - environment-settings
+    if: needs.resolve-target.outputs.environment == 'dev' && needs.environment-settings.outputs.deploy_enabled != 'true'
+    environment:
+      name: dev
+    steps:
+      - name: Skip deploy
+        run: echo "The dev environment resolved correctly, but deployment is disabled until a dev server exists."
+
+  build-frontend-image:
+    name: Build and Push Frontend Image
+    runs-on: ubuntu-latest
+    needs:
+      - resolve-target
+      - environment-settings
+    if: needs.environment-settings.outputs.deploy_enabled == 'true'
+    environment:
+      name: ${{ needs.resolve-target.outputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ needs.environment-settings.outputs.registry }}
+          username: ${{ vars.REGISTRY_USERNAME || github.actor }}
+          password: ${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ needs.environment-settings.outputs.frontend_context }}
+          file: ${{ needs.environment-settings.outputs.frontend_dockerfile }}
+          push: true
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
+          tags: |
+            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.environment-settings.outputs.image_tag }}
+            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.resolve-target.outputs.branch }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  build-backend-images:
+    name: Build and Push Backend Image (${{ matrix.service.id }})
+    runs-on: ubuntu-latest
+    needs:
+      - resolve-target
+      - environment-settings
+    if: needs.environment-settings.outputs.deploy_enabled == 'true'
+    environment:
+      name: ${{ needs.resolve-target.outputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.environment-settings.outputs.backend_images) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ needs.environment-settings.outputs.registry }}
+          username: ${{ vars.REGISTRY_USERNAME || github.actor }}
+          password: ${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.environment-settings.outputs.image_tag }}
+            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.resolve-target.outputs.branch }}
+          cache-from: type=gha,scope=${{ matrix.service.id }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.id }}
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs:
+      - resolve-target
+      - environment-settings
+      - build-frontend-image
+      - build-backend-images
+    if: needs.environment-settings.outputs.deploy_enabled == 'true'
+    environment:
+      name: ${{ needs.resolve-target.outputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_PRIVATE_KEY }}
+
+      - name: Trust deployment host key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.DROPLET_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Create deployment directories
+        shell: bash
+        env:
+          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
+          SSH_HOST: ${{ secrets.DROPLET_HOST }}
+          SSH_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          set -euo pipefail
+          : "${APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
+
+          ssh "${SSH_USER}@${SSH_HOST}" "sudo mkdir -p '${APP_DIR}'"
+          ssh "${SSH_USER}@${SSH_HOST}" "sudo chown -R '${SSH_USER}:${SSH_USER}' '${APP_DIR}'"
+
+          migrations="$(jq -r '.backend_services[].id' .github/service-manifest.json)"
+          for service in ${migrations}; do
+            ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p '${APP_DIR}/migrations/${service}'"
+          done
+
+      - name: Upload compose, deploy script, and migrations
+        shell: bash
+        env:
+          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
+          COMPOSE_FILE: ${{ needs.environment-settings.outputs.deploy_compose_file }}
+          COMPOSE_SOURCE: ${{ needs.environment-settings.outputs.deploy_compose_source }}
+          DEPLOY_SCRIPT_FILE: ${{ needs.environment-settings.outputs.deploy_script_file }}
+          DEPLOY_SCRIPT_SOURCE: ${{ needs.environment-settings.outputs.deploy_script_source }}
+          SSH_HOST: ${{ secrets.DROPLET_HOST }}
+          SSH_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          set -euo pipefail
+          : "${APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
+          : "${COMPOSE_FILE:?DEPLOY_COMPOSE_FILE environment variable is required}"
+          : "${COMPOSE_SOURCE:?DEPLOY_COMPOSE_SOURCE environment variable is required}"
+          : "${DEPLOY_SCRIPT_FILE:?DEPLOY_SCRIPT_FILE environment variable is required}"
+          : "${DEPLOY_SCRIPT_SOURCE:?DEPLOY_SCRIPT_SOURCE environment variable is required}"
+
+          scp "${COMPOSE_SOURCE}" "${SSH_USER}@${SSH_HOST}:${APP_DIR}/${COMPOSE_FILE}"
+          scp "${DEPLOY_SCRIPT_SOURCE}" "${SSH_USER}@${SSH_HOST}:${APP_DIR}/${DEPLOY_SCRIPT_FILE}"
+
+          jq -c '.backend_services[]' .github/service-manifest.json | while read -r service; do
+            id="$(jq -r '.id' <<< "$service")"
+            migrations="$(jq -r '.migrations' <<< "$service")"
+
+            ssh "${SSH_USER}@${SSH_HOST}" "rm -rf '${APP_DIR}/migrations/${id}'/*"
+            if compgen -G "${migrations}/*.sql" > /dev/null; then
+              scp "${migrations}"/*.sql "${SSH_USER}@${SSH_HOST}:${APP_DIR}/migrations/${id}/"
+            fi
+          done
+
+          ssh "${SSH_USER}@${SSH_HOST}" "chmod +x '${APP_DIR}/${DEPLOY_SCRIPT_FILE}'"
+
+      - name: Write deployment env file
+        shell: bash
+        env:
+          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
+          COMPOSE_PROJECT_NAME: ${{ needs.environment-settings.outputs.compose_project_name }}
+          IMAGE_REGISTRY: ${{ needs.environment-settings.outputs.registry }}
+          IMAGE_NAMESPACE: ${{ needs.environment-settings.outputs.image_namespace }}
+          IMAGE_TAG: ${{ needs.environment-settings.outputs.image_tag }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          API_HOST: ${{ vars.API_HOST }}
+          TRAEFIK_ACME_EMAIL: ${{ vars.TRAEFIK_ACME_EMAIL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          USERS_DB_USER: ${{ vars.USERS_DB_USER }}
+          USERS_DB_PASSWORD: ${{ secrets.USERS_DB_PASSWORD }}
+          POMOTIMER_DB_USER: ${{ vars.POMOTIMER_DB_USER }}
+          POMOTIMER_DB_PASSWORD: ${{ secrets.POMOTIMER_DB_PASSWORD }}
+          SSH_HOST: ${{ secrets.DROPLET_HOST }}
+          SSH_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          set -euo pipefail
+          : "${APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
+          : "${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME environment variable is required}"
+
+          {
+            printf '%s\n' "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+            printf '%s\n' "IMAGE_REGISTRY=${IMAGE_REGISTRY}"
+            printf '%s\n' "IMAGE_NAMESPACE=${IMAGE_NAMESPACE}"
+            printf '%s\n' "IMAGE_TAG=${IMAGE_TAG}"
+            printf '%s\n' "APP_HOST=${APP_HOST}"
+            printf '%s\n' "API_HOST=${API_HOST}"
+            printf '%s\n' "TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL}"
+            printf '%s\n' "DB_HOST=${DB_HOST}"
+            printf '%s\n' "DB_PORT=${DB_PORT}"
+            printf '%s\n' "DB_NAME=${DB_NAME}"
+            printf '%s\n' "USERS_DB_USER=${USERS_DB_USER}"
+            printf '%s\n' "USERS_DB_PASSWORD=${USERS_DB_PASSWORD}"
+            printf '%s\n' "POMOTIMER_DB_USER=${POMOTIMER_DB_USER}"
+            printf '%s\n' "POMOTIMER_DB_PASSWORD=${POMOTIMER_DB_PASSWORD}"
+          } > deployment.env
+
+          scp deployment.env "${SSH_USER}@${SSH_HOST}:${APP_DIR}/.env"
+          ssh "${SSH_USER}@${SSH_HOST}" "chmod 600 '${APP_DIR}/.env'"
+
+      - name: Log in to container registry on deployment host
+        shell: bash
+        env:
+          REGISTRY: ${{ needs.environment-settings.outputs.registry }}
+          REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME || github.repository_owner }}
+          REGISTRY_READ_TOKEN: ${{ secrets.REGISTRY_READ_TOKEN || secrets.GHCR_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${REGISTRY:?REGISTRY environment variable is required}"
+          : "${REGISTRY_USERNAME:?REGISTRY_USERNAME environment variable is required}"
+          : "${REGISTRY_READ_TOKEN:?REGISTRY_READ_TOKEN environment secret is required}"
+
+          ssh "${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}" "echo '${REGISTRY_READ_TOKEN}' | docker login '${REGISTRY}' -u '${REGISTRY_USERNAME}' --password-stdin"
+
+      - name: Deploy with Docker Compose
+        shell: bash
+        env:
+          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
+          COMPOSE_FILE: ${{ needs.environment-settings.outputs.deploy_compose_file }}
+          DEPLOY_SCRIPT_FILE: ${{ needs.environment-settings.outputs.deploy_script_file }}
+          ENV_FILE: ${{ needs.environment-settings.outputs.deploy_env_file }}
+          TARGET_ENVIRONMENT: ${{ needs.resolve-target.outputs.environment }}
+          SSH_HOST: ${{ secrets.DROPLET_HOST }}
+          SSH_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          set -euo pipefail
+          : "${APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
+          : "${COMPOSE_FILE:?DEPLOY_COMPOSE_FILE environment variable is required}"
+          : "${DEPLOY_SCRIPT_FILE:?DEPLOY_SCRIPT_FILE environment variable is required}"
+          : "${ENV_FILE:?DEPLOY_ENV_FILE environment variable is required}"
+
+          ssh "${SSH_USER}@${SSH_HOST}" "'${APP_DIR}/${DEPLOY_SCRIPT_FILE}' '${TARGET_ENVIRONMENT}' '${APP_DIR}' '${COMPOSE_FILE}' '${ENV_FILE}'"
