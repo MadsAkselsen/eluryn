@@ -61,7 +61,7 @@ The tradeoff is that the droplet temporarily has DB migration credentials. That 
 1. Add the GitHub variables and secrets.
 2. Install Docker and Docker Compose v2 on the droplet.
 3. Ensure Cloudflare DNS points `eluryn.com` and `api.eluryn.com` to the droplet and ports 80/443 are open.
-4. Run the CD workflow manually with `workflow_dispatch`.
+4. Push to `prd` and let the CI workflow pass.
 5. Confirm Traefik issued certificates and all services are healthy.
 6. Let `prd` pushes deploy automatically.
 

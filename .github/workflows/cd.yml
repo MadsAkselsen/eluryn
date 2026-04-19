@@ -1,11 +1,14 @@
 name: CD
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - prd
       - dev
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,16 +22,21 @@ jobs:
   resolve-target:
     name: Resolve Target Environment
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
     outputs:
       environment: ${{ steps.target.outputs.environment }}
+      branch: ${{ steps.target.outputs.branch }}
+      sha: ${{ steps.target.outputs.sha }}
     steps:
       - name: Resolve branch
         id: target
         shell: bash
         run: |
           set -euo pipefail
+          branch="${{ github.event.workflow_run.head_branch }}"
+          sha="${{ github.event.workflow_run.head_sha }}"
 
-          case "${GITHUB_REF_NAME}" in
+          case "${branch}" in
             prd)
               environment="prd"
               ;;
@@ -36,13 +44,15 @@ jobs:
               environment="dev"
               ;;
             *)
-              echo "::error::No deployment environment is mapped for branch '${GITHUB_REF_NAME}'."
+              echo "::error::No deployment environment is mapped for branch '${branch}'."
               exit 1
               ;;
           esac
 
           echo "environment=${environment}" >> "$GITHUB_OUTPUT"
-          echo "Resolved '${GITHUB_REF_NAME}' to '${environment}'."
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "Resolved '${branch}' to '${environment}' at '${sha}'."
 
   environment-settings:
     name: Load Environment Settings
@@ -70,6 +80,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
 
       - name: Read service manifest
         id: manifest
@@ -122,7 +134,7 @@ jobs:
           fi
 
           image_namespace="${GITHUB_REPOSITORY_OWNER,,}"
-          image_tag="sha-${GITHUB_SHA}"
+          image_tag="sha-${{ needs.resolve-target.outputs.sha }}"
 
           echo "deploy_enabled=${deploy_enabled}" >> "$GITHUB_OUTPUT"
           echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
@@ -161,6 +173,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -182,7 +196,7 @@ jobs:
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
           tags: |
             ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.environment-settings.outputs.image_tag }}
-            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ github.ref_name }}
+            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.resolve-target.outputs.branch }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -202,6 +216,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -221,7 +237,7 @@ jobs:
           push: true
           tags: |
             ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.environment-settings.outputs.image_tag }}
-            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ github.ref_name }}
+            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.resolve-target.outputs.branch }}
           cache-from: type=gha,scope=${{ matrix.service.id }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service.id }}
 
@@ -239,6 +255,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-target.outputs.sha }}
 
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.1
