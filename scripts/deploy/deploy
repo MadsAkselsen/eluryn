@@ -1,11 +1,14 @@
 #!/usr/bin/env sh
 set -eu
 
-APP_DIR=${APP_DIR:-/opt/eluryn}
-COMPOSE_FILE=${COMPOSE_FILE:-compose.prod.yml}
-ENV_FILE=${ENV_FILE:-.env}
+ENVIRONMENT=${1:?Usage: deploy <environment> <app-dir> <compose-file> <env-file>}
+APP_DIR=${2:?Usage: deploy <environment> <app-dir> <compose-file> <env-file>}
+COMPOSE_FILE=${3:?Usage: deploy <environment> <app-dir> <compose-file> <env-file>}
+ENV_FILE=${4:?Usage: deploy <environment> <app-dir> <compose-file> <env-file>}
 
 cd "$APP_DIR"
+
+echo "Deploying ${ENVIRONMENT} from ${APP_DIR} with ${COMPOSE_FILE}"
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull
 
