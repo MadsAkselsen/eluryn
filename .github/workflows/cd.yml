@@ -18,6 +18,16 @@ concurrency:
   group: cd-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  REGISTRY: ghcr.io
+  DEPLOY_APP_DIR: /opt/eluryn
+  DEPLOY_COMPOSE_SOURCE: compose/prd/compose.yml
+  DEPLOY_COMPOSE_FILE: compose.yml
+  DEPLOY_SCRIPT_SOURCE: scripts/deploy/deploy
+  DEPLOY_SCRIPT_FILE: deploy
+  DEPLOY_ENV_FILE: .env
+  COMPOSE_PROJECT_NAME: eluryn
+
 jobs:
   resolve-target:
     name: Resolve Target Environment
@@ -63,16 +73,8 @@ jobs:
       name: ${{ needs.resolve-target.outputs.environment }}
     outputs:
       deploy_enabled: ${{ steps.settings.outputs.deploy_enabled }}
-      registry: ${{ steps.settings.outputs.registry }}
       image_namespace: ${{ steps.settings.outputs.image_namespace }}
       image_tag: ${{ steps.settings.outputs.image_tag }}
-      deploy_app_dir: ${{ steps.settings.outputs.deploy_app_dir }}
-      deploy_compose_source: ${{ steps.settings.outputs.deploy_compose_source }}
-      deploy_compose_file: ${{ steps.settings.outputs.deploy_compose_file }}
-      deploy_script_source: ${{ steps.settings.outputs.deploy_script_source }}
-      deploy_script_file: ${{ steps.settings.outputs.deploy_script_file }}
-      deploy_env_file: ${{ steps.settings.outputs.deploy_env_file }}
-      compose_project_name: ${{ steps.settings.outputs.compose_project_name }}
       frontend_image: ${{ steps.manifest.outputs.frontend_image }}
       frontend_context: ${{ steps.manifest.outputs.frontend_context }}
       frontend_dockerfile: ${{ steps.manifest.outputs.frontend_dockerfile }}
@@ -103,15 +105,6 @@ jobs:
       - name: Prepare settings
         id: settings
         shell: bash
-        env:
-          REGISTRY: ${{ vars.REGISTRY }}
-          DEPLOY_APP_DIR: ${{ vars.DEPLOY_APP_DIR }}
-          DEPLOY_COMPOSE_SOURCE: ${{ vars.DEPLOY_COMPOSE_SOURCE }}
-          DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE }}
-          DEPLOY_SCRIPT_SOURCE: ${{ vars.DEPLOY_SCRIPT_SOURCE }}
-          DEPLOY_SCRIPT_FILE: ${{ vars.DEPLOY_SCRIPT_FILE }}
-          DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE }}
-          COMPOSE_PROJECT_NAME: ${{ vars.COMPOSE_PROJECT_NAME }}
         run: |
           set -euo pipefail
 
@@ -122,31 +115,12 @@ jobs:
             deploy_enabled="true"
           fi
 
-          if [ "$deploy_enabled" = "true" ]; then
-            : "${REGISTRY:?REGISTRY environment variable is required}"
-            : "${DEPLOY_APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
-            : "${DEPLOY_COMPOSE_SOURCE:?DEPLOY_COMPOSE_SOURCE environment variable is required}"
-            : "${DEPLOY_COMPOSE_FILE:?DEPLOY_COMPOSE_FILE environment variable is required}"
-            : "${DEPLOY_SCRIPT_SOURCE:?DEPLOY_SCRIPT_SOURCE environment variable is required}"
-            : "${DEPLOY_SCRIPT_FILE:?DEPLOY_SCRIPT_FILE environment variable is required}"
-            : "${DEPLOY_ENV_FILE:?DEPLOY_ENV_FILE environment variable is required}"
-            : "${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME environment variable is required}"
-          fi
-
           image_namespace="${GITHUB_REPOSITORY_OWNER,,}"
           image_tag="sha-${{ needs.resolve-target.outputs.sha }}"
 
           echo "deploy_enabled=${deploy_enabled}" >> "$GITHUB_OUTPUT"
-          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
           echo "image_namespace=${image_namespace}" >> "$GITHUB_OUTPUT"
           echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
-          echo "deploy_app_dir=${DEPLOY_APP_DIR}" >> "$GITHUB_OUTPUT"
-          echo "deploy_compose_source=${DEPLOY_COMPOSE_SOURCE}" >> "$GITHUB_OUTPUT"
-          echo "deploy_compose_file=${DEPLOY_COMPOSE_FILE}" >> "$GITHUB_OUTPUT"
-          echo "deploy_script_source=${DEPLOY_SCRIPT_SOURCE}" >> "$GITHUB_OUTPUT"
-          echo "deploy_script_file=${DEPLOY_SCRIPT_FILE}" >> "$GITHUB_OUTPUT"
-          echo "deploy_env_file=${DEPLOY_ENV_FILE}" >> "$GITHUB_OUTPUT"
-          echo "compose_project_name=${COMPOSE_PROJECT_NAME}" >> "$GITHUB_OUTPUT"
 
   dev-placeholder:
     name: Dev Deployment Placeholder
@@ -182,8 +156,8 @@ jobs:
       - name: Log in to container registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ needs.environment-settings.outputs.registry }}
-          username: ${{ vars.REGISTRY_USERNAME || github.actor }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
           password: ${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
 
       - name: Build and push
@@ -195,8 +169,8 @@ jobs:
           build-args: |
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
           tags: |
-            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.environment-settings.outputs.image_tag }}
-            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.resolve-target.outputs.branch }}
+            ${{ env.REGISTRY }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.environment-settings.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ needs.environment-settings.outputs.frontend_image }}:${{ needs.resolve-target.outputs.branch }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -225,8 +199,8 @@ jobs:
       - name: Log in to container registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ needs.environment-settings.outputs.registry }}
-          username: ${{ vars.REGISTRY_USERNAME || github.actor }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
           password: ${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
 
       - name: Build and push
@@ -236,8 +210,8 @@ jobs:
           file: ${{ matrix.service.dockerfile }}
           push: true
           tags: |
-            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.environment-settings.outputs.image_tag }}
-            ${{ needs.environment-settings.outputs.registry }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.resolve-target.outputs.branch }}
+            ${{ env.REGISTRY }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.environment-settings.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ needs.environment-settings.outputs.image_namespace }}/${{ matrix.service.image }}:${{ needs.resolve-target.outputs.branch }}
           cache-from: type=gha,scope=${{ matrix.service.id }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service.id }}
 
@@ -273,7 +247,7 @@ jobs:
       - name: Create deployment directories
         shell: bash
         env:
-          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
+          APP_DIR: ${{ env.DEPLOY_APP_DIR }}
           SSH_HOST: ${{ secrets.DROPLET_HOST }}
           SSH_USER: ${{ secrets.DROPLET_USER }}
         run: |
@@ -291,11 +265,11 @@ jobs:
       - name: Upload compose, deploy script, and migrations
         shell: bash
         env:
-          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
-          COMPOSE_FILE: ${{ needs.environment-settings.outputs.deploy_compose_file }}
-          COMPOSE_SOURCE: ${{ needs.environment-settings.outputs.deploy_compose_source }}
-          DEPLOY_SCRIPT_FILE: ${{ needs.environment-settings.outputs.deploy_script_file }}
-          DEPLOY_SCRIPT_SOURCE: ${{ needs.environment-settings.outputs.deploy_script_source }}
+          APP_DIR: ${{ env.DEPLOY_APP_DIR }}
+          COMPOSE_FILE: ${{ env.DEPLOY_COMPOSE_FILE }}
+          COMPOSE_SOURCE: ${{ env.DEPLOY_COMPOSE_SOURCE }}
+          DEPLOY_SCRIPT_FILE: ${{ env.DEPLOY_SCRIPT_FILE }}
+          DEPLOY_SCRIPT_SOURCE: ${{ env.DEPLOY_SCRIPT_SOURCE }}
           SSH_HOST: ${{ secrets.DROPLET_HOST }}
           SSH_USER: ${{ secrets.DROPLET_USER }}
         run: |
@@ -324,9 +298,9 @@ jobs:
       - name: Write deployment env file
         shell: bash
         env:
-          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
-          COMPOSE_PROJECT_NAME: ${{ needs.environment-settings.outputs.compose_project_name }}
-          IMAGE_REGISTRY: ${{ needs.environment-settings.outputs.registry }}
+          APP_DIR: ${{ env.DEPLOY_APP_DIR }}
+          COMPOSE_PROJECT_NAME: ${{ env.COMPOSE_PROJECT_NAME }}
+          IMAGE_REGISTRY: ${{ env.REGISTRY }}
           IMAGE_NAMESPACE: ${{ needs.environment-settings.outputs.image_namespace }}
           IMAGE_TAG: ${{ needs.environment-settings.outputs.image_tag }}
           APP_HOST: ${{ vars.APP_HOST }}
@@ -369,8 +343,8 @@ jobs:
       - name: Log in to container registry on deployment host
         shell: bash
         env:
-          REGISTRY: ${{ needs.environment-settings.outputs.registry }}
-          REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME || github.repository_owner }}
+          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY_USERNAME: ${{ github.repository_owner }}
           REGISTRY_READ_TOKEN: ${{ secrets.REGISTRY_READ_TOKEN || secrets.GHCR_READ_TOKEN }}
         run: |
           set -euo pipefail
@@ -383,10 +357,10 @@ jobs:
       - name: Deploy with Docker Compose
         shell: bash
         env:
-          APP_DIR: ${{ needs.environment-settings.outputs.deploy_app_dir }}
-          COMPOSE_FILE: ${{ needs.environment-settings.outputs.deploy_compose_file }}
-          DEPLOY_SCRIPT_FILE: ${{ needs.environment-settings.outputs.deploy_script_file }}
-          ENV_FILE: ${{ needs.environment-settings.outputs.deploy_env_file }}
+          APP_DIR: ${{ env.DEPLOY_APP_DIR }}
+          COMPOSE_FILE: ${{ env.DEPLOY_COMPOSE_FILE }}
+          DEPLOY_SCRIPT_FILE: ${{ env.DEPLOY_SCRIPT_FILE }}
+          ENV_FILE: ${{ env.DEPLOY_ENV_FILE }}
           TARGET_ENVIRONMENT: ${{ needs.resolve-target.outputs.environment }}
           SSH_HOST: ${{ secrets.DROPLET_HOST }}
           SSH_USER: ${{ secrets.DROPLET_USER }}

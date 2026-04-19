@@ -2,7 +2,7 @@
 
 ## Image Names
 
-Images are published to the registry configured by the `prd` GitHub Environment:
+Images are published to the registry configured in the workflow:
 
 - `<registry>/<owner>/eluryn-frontend:sha-<commit-sha>`
 - `<registry>/<owner>/eluryn-users-api:sha-<commit-sha>`
@@ -10,18 +10,23 @@ Images are published to the registry configured by the `prd` GitHub Environment:
 
 The workflow also publishes a mutable `:prd` tag for quick inspection, but the droplet deploys the immutable `sha-<commit-sha>` tag.
 
-## GitHub Variables
+## Deployment Settings
 
-Set these in the `prd` GitHub Environment:
+These non-secret deployment settings are defined in the workflow:
 
 - `REGISTRY`: `ghcr.io`
 - `DEPLOY_APP_DIR`: `/opt/eluryn`
-- `DEPLOY_COMPOSE_SOURCE`: `compose/prd/compose.prd.yml`
-- `DEPLOY_COMPOSE_FILE`: `compose.prd.yml`
+- `DEPLOY_COMPOSE_SOURCE`: `compose/prd/compose.yml`
+- `DEPLOY_COMPOSE_FILE`: `compose.yml`
 - `DEPLOY_SCRIPT_SOURCE`: `scripts/deploy/deploy`
 - `DEPLOY_SCRIPT_FILE`: `deploy`
 - `DEPLOY_ENV_FILE`: `.env`
 - `COMPOSE_PROJECT_NAME`: `eluryn`
+
+## GitHub Variables
+
+Set these in the `prd` GitHub Environment:
+
 - `APP_HOST`: `eluryn.com`
 - `API_HOST`: `api.eluryn.com`
 - `VITE_API_BASE_URL`: `https://api.eluryn.com`
