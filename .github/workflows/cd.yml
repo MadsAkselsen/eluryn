@@ -254,8 +254,7 @@ jobs:
           set -euo pipefail
           : "${APP_DIR:?DEPLOY_APP_DIR environment variable is required}"
 
-          ssh "${SSH_USER}@${SSH_HOST}" "sudo mkdir -p '${APP_DIR}'"
-          ssh "${SSH_USER}@${SSH_HOST}" "sudo chown -R '${SSH_USER}:${SSH_USER}' '${APP_DIR}'"
+          ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p '${APP_DIR}'"
 
           migrations="$(jq -r '.backend_services[].id' .github/service-manifest.json)"
           for service in ${migrations}; do
