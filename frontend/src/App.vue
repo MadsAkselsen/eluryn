@@ -7,6 +7,7 @@ import {
   putPomodoroSettings,
   type PomodoroSettingsRequest,
 } from "@/api/pomotimer";
+import backgroundPlaceholderUrl from "../../media/background-placeholder.png";
 
 const userId = ref("11111111-1111-1111-1111-111111111111");
 const form = ref<PomodoroSettingsRequest>({
@@ -22,6 +23,9 @@ const result = ref<unknown>(null);
 const lastAction = ref<string | null>(null);
 
 const apiBaseUrl = computed(() => import.meta.env.VITE_API_BASE_URL || "not configured");
+const backgroundStyle = computed(() => ({
+  backgroundImage: `url(${backgroundPlaceholderUrl})`,
+}));
 
 async function runRequest(action: string, request: () => Promise<unknown>) {
   loading.value = true;
@@ -53,63 +57,26 @@ function saveSettings() {
 </script>
 
 <template>
-  <main class="endpoint-tester">
-    <section class="intro">
-      <p class="eyebrow">Pomotimer API</p>
-      <h1>Controller endpoint test</h1>
-      <p>Base URL: {{ apiBaseUrl }}</p>
-    </section>
+  <main class="app-background" :style="backgroundStyle">
+    <div class="endpoint-tester">
 
-    <section class="tester-panel">
-      <label>
-        User ID
-        <input v-model="userId" autocomplete="off" />
-      </label>
-
-      <div class="settings-grid">
-        <label>
-          Focus seconds
-          <input v-model.number="form.focusSeconds" type="number" min="1" />
-        </label>
-
-        <label>
-          Short break seconds
-          <input v-model.number="form.shortBreakSeconds" type="number" min="1" />
-        </label>
-
-        <label>
-          Long break seconds
-          <input v-model.number="form.longBreakSeconds" type="number" min="1" />
-        </label>
-
-        <label>
-          Long break interval
-          <input v-model.number="form.longBreakInterval" type="number" min="1" />
-        </label>
-      </div>
-
-      <div class="actions">
-        <button :disabled="loading" @click="checkHealth">GET health</button>
-        <button :disabled="loading" @click="saveSettings">PUT settings</button>
-        <button :disabled="loading" @click="fetchSettings">GET settings</button>
-      </div>
-    </section>
-
-    <section class="response-panel" aria-live="polite">
-      <div class="response-heading">
-        <h2>Response</h2>
-        <span v-if="lastAction">{{ lastAction }}</span>
-      </div>
-
-      <p v-if="loading">Sending request...</p>
-      <p v-else-if="error" class="error">{{ error }}</p>
-      <pre v-else-if="result">{{ JSON.stringify(result, null, 2) }}</pre>
-      <p v-else>Run a request to see the controller response.</p>
-    </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
+.app-background {
+  width: 100vw;
+  min-height: 100dvh;
+  margin-inline: calc(50% - 50vw);
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 3rem);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
 .endpoint-tester {
   width: min(960px, 100%);
   display: grid;
