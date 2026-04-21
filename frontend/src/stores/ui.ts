@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 export type AppView = 'landing' | 'room'
 export type AppPanel = 'settings' | 'profile' | null
 
-const backgroundImageModules = import.meta.glob('../../../media/background-*.png', {
+const backgroundImageModules = import.meta.glob('../assets/media/background-*.png', {
   eager: true,
   import: 'default',
 })
