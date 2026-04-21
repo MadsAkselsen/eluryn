@@ -161,7 +161,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ needs.environment-settings.outputs.frontend_context }}
           file: ${{ needs.environment-settings.outputs.frontend_dockerfile }}
@@ -204,7 +204,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile }}
