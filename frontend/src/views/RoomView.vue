@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 
 import { usePomodoroStore } from '@/stores/pomodoro'
-import { useRoomStore } from '@/stores/room'
+// import { useRoomStore } from '@/stores/room'
 import { useUiStore } from '@/stores/ui'
 
 const pomodoro = usePomodoroStore()
