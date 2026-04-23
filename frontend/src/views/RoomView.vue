@@ -6,7 +6,7 @@ import { useRoomStore } from '@/stores/room'
 import { useUiStore } from '@/stores/ui'
 
 const pomodoro = usePomodoroStore()
-const room = useRoomStore()
+// const room = useRoomStore()
 const ui = useUiStore()
 const isPomodoroMenuOpen = ref(false)
 
@@ -65,12 +65,12 @@ const markerStyle = computed(() => ({
       </div>
     </section>
 
-    <aside class="chat-panel" aria-label="Room chat">
+    <!-- <aside class="chat-panel" aria-label="Room chat">
       <p v-for="message in room.chatMessages" :key="message.id">
         <strong>{{ message.author }}</strong>
         {{ message.body }}
       </p>
-    </aside>
+    </aside> -->
   </main>
 </template>
 
