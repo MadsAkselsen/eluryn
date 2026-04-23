@@ -65,12 +65,12 @@ const markerStyle = computed(() => ({
       </div>
     </section>
 
-    <aside class="chat-panel" aria-label="Room chat">
+    <!-- <aside class="chat-panel" aria-label="Room chat">
       <p v-for="message in room.chatMessages" :key="message.id">
         <strong>{{ message.author }}</strong>
         {{ message.body }}
       </p>
-    </aside>
+    </aside> -->
   </main>
 </template>
 
