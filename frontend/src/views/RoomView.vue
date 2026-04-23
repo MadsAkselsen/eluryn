@@ -6,7 +6,7 @@ import { useRoomStore } from '@/stores/room'
 import { useUiStore } from '@/stores/ui'
 
 const pomodoro = usePomodoroStore()
-const room = useRoomStore()
+// const room = useRoomStore()
 const ui = useUiStore()
 const isPomodoroMenuOpen = ref(false)
 
