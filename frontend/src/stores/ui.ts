@@ -4,17 +4,20 @@ import { defineStore } from 'pinia'
 export type AppView = 'landing' | 'room'
 export type AppPanel = 'settings' | 'profile' | null
 
-const backgroundImageModules = import.meta.glob('../assets/media/background-*.png', {
-  eager: true,
-  import: 'default',
-})
+const backgroundImageModules = import.meta.glob(
+  '../assets/media/*.{avif,jpeg,jpg,png,webp}',
+  {
+    eager: true,
+    import: 'default',
+  },
+)
 
 const backgroundImages = Object.entries(backgroundImageModules)
   .map(([path, url]) => {
     const fileName = path.split('/').at(-1) ?? path
 
     return {
-      name: fileName.replace('.png', '').replaceAll('-', ' '),
+      name: fileName.replace(/\.[^.]+$/, '').replaceAll('-', ' '),
       url: url as string,
     }
   })
